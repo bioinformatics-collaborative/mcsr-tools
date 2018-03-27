@@ -6,6 +6,7 @@ import yaml
 import random
 from tempfile import TemporaryFile
 from pathlib import Path
+import pandas as pd
 from time import sleep
 import getpass
 import re
@@ -119,11 +120,17 @@ class Qwatch(object):
     A class for parsing "qstat -f" output on SGE systems for monitoring
     jobs and making smart decisions about resource allocation.
     """
-    def __init__(self, jobs: list=None, metadata: str=None, email: str=None, infile: str=None, watch: (bool or None)=None, plot: (bool or None)=None,
-                 filename_pattern: str=None, directory: str=None, users: list = list(os.getlogin()), cmd: str="qstat -f"):
+    def __init__(self, jobs: list=None, metadata: list=None, email: str=None, infile: str=None, watch: (bool or None)=None, plot: (bool or None)=None,
+                 filename_pattern: str=None, directory: str='.', users: list = list(os.getlogin()), cmd: str="qstat -f"):
         self.cmd = cmd
-        self.users = users
-        self.jobs = jobs
+        if not users:
+            self.users = []
+        else:
+            self.users = users
+        if not jobs:
+            self.jobs = []
+        else:
+            self.jobs = jobs
         self.metadata = metadata
         self.email = email
         self.infile = infile
@@ -134,6 +141,7 @@ class Qwatch(object):
         self.qstat_filename = Path()
         self.yaml_filename, self.csv_filename, self.plot_filename = Path(), Path(), Path()
         self._yaml_config = "qwatch/qstat_dict.yml"
+        self.initialize_data_files()
 
     def initialize_data_files(self):
 
@@ -175,7 +183,7 @@ class Qwatch(object):
         # Filter and keep only the selected jobs and then create a YAML file
         kept_jobs, kept_dict = self.filter_jobs(job_dict)
         with open(self.yaml_filename, 'w') as yf:
-            yaml.dump(kept_dict, stream=yf)
+            yaml.dump(job_dict, stream=yf, default_flow_style=False)
 
     def qstat_parser(self):
         mast_dict = {}
@@ -209,7 +217,7 @@ class Qwatch(object):
                         main_key = "%s" % _[1].replace("\r\n", "")
                         main_key = main_key.replace("\n", "")
                         mast_dict[main_key] = {}
-                        mast_dict[main_key]["Job Id"] = "%s" % _[1]
+                        mast_dict[main_key]["Job_Id"] = main_key
                     elif "    " in item and any(kw in item for kw in list(qstat_keywords["Job Id"].keys()) + list(qstat_keywords["Job Id"]["Variable_List"].keys())) or item == "\n":
                         #print(f'spaces:{item}')
                         item = item.replace("    ", "")
@@ -231,7 +239,7 @@ class Qwatch(object):
 
                     # For multi-line phrases
                     if tab_flag is False:
-                        qstat_sentence = qstat_sentence.replace("\n\t", "")
+                        qstat_sentence = qstat_sentence.replace("\n\t", "").replace('\n', '')
                         print(f'sentence:  {qstat_sentence}')
                         cont_phrase = ""
                         tab_flag = None
@@ -248,7 +256,7 @@ class Qwatch(object):
                             mast_dict[main_key]["Variable_List"] = temp_dict
                             temp_dict = {}
                         else:
-                            mast_dict[main_key][key] = qstat_sentence.replace('\n', '')
+                            mast_dict[main_key][key] = qstat_sentence
 
                     # For single line Phrases
                     elif qstat_sentence:
@@ -261,6 +269,29 @@ class Qwatch(object):
                     qstat_sentence = None
                     prev_item = item
         return mast_dict
+
+    def get_metadata(self):
+        if not self.yaml_filename.is_file():
+            self.process_jobs()
+        with open(self.yaml_filename, 'r') as yf:
+            jobs_dict = yaml.load(yf)
+        df = {}
+        for job in jobs_dict.keys():
+            row = {}
+            if not self.metadata:
+                row = jobs_dict[job]
+            else:
+                for var in self.metadata:
+                    item = jobs_dict[job][var]
+                    row[var] = item
+            df.update(row)
+        # Rework this
+        print(pd.DataFrame.from_dict(df))
+
+
+
+
+
 
     # def qstat_parser(self):
     #     mast_dict = {}
