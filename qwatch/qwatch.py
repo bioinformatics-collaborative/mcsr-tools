@@ -119,7 +119,8 @@ class Qwatch(object):
     A class for parsing "qstat -f" output on SGE systems for monitoring
     jobs and making smart decisions about resource allocation.
     """
-    def __init__(self, users, jobs, metadata, email, infile, watch, plot, filename_pattern, directory, cmd="qstat -f"):
+    def __init__(self, jobs: list=None, metadata: str=None, email: str=None, infile: str=None, watch: (bool or None)=None, plot: (bool or None)=None,
+                 filename_pattern: str=None, directory: str=None, users: list = list(os.getlogin()), cmd: str="qstat -f"):
         self.cmd = cmd
         self.users = users
         self.jobs = jobs
@@ -131,7 +132,8 @@ class Qwatch(object):
         self.directory = directory
         self.filename_pattern = filename_pattern
         self.qstat_filename = Path()
-        self.yaml_filename, self.csv_filename, self.plot_filename = Path()
+        self.yaml_filename, self.csv_filename, self.plot_filename = Path(), Path(), Path()
+        self._yaml_config = "qwatch/qstat_dict.yml"
 
     def initialize_data_files(self):
 
@@ -181,48 +183,147 @@ class Qwatch(object):
         line_flag = False
         sub_dict = {}
         job_count = 0
+        keyword_flag = None
+        jobid_flag = None
+        space_flag = None
+        tab_flag = None
+        temp_dict = {}
         with open(self.qstat_filename, 'r') as qf:
-            for item in qf.readlines():
-                print(item)
-                item = item.rstrip("\n")
-                item = item.rstrip("\r")
-                if "Job Id" in item:
-                    job_count += 1
-                    if job_count > len(mast_dict.keys()) and job_count > 1:
-                        mast_dict[main_key] = sub_dict
-                        mast_dict[main_key]["Variable_List"] = dict(var.split("=") for var in mast_dict[main_key]["Variable_List"])
-                    _ = item.split(": ")
-                    main_key = "%s" % _[1].replace("\r\n", "")
-                    mast_dict[main_key] = {}
-                    mast_dict[main_key]["Job Id"] = "%s" % _[1]
-                    continue
-                else:
-                    _ = item.split(" = ")
-                    if len(_) == 2:
-                        key = _[0].replace(" ", "")
-                        value = _[1].replace("\r\n", "")
-                        sub_dict[key] = value
-                        line_flag = False
-                    elif len(_) == 1:
-                        k = key
-                        v = value
-                        line_flag = True
-                        if len(line_list) == 0:
-                            line_list.append(value)
-                        line_list.append(_[0].replace("\r\n", "").replace(" ", ""))
-                    if not line_flag and len(line_list) > 0:
-                        line_string = ''.join(line_list)
-                        line_list = line_string.split(",")
-                        sub_dict[k] = line_list
+            #print(qf.readlines())
+            with open(self._yaml_config, 'r') as yf:
+                qstat_keywords = yaml.load(yf)
+                qstat_sentence = None
+                cont_phrase = ""
+                qstat_phrase = ""
+                prev_item = None
+                for item in qf.readlines():
+                    if keyword_flag is False:
+                        #print(last_item)
+                        pass
+                    if "Job Id" in item:
+                        jobid_flag = True
+                        job_count += 1
                         line_list = []
-                mast_dict[main_key] = sub_dict
-                temp_dict = dict(var.split("=") for var in mast_dict[main_key]["Variable_List"])
-                for key, value in temp_dict.items():
-                    if value[0] == "/" or value[0] == "\\":
-                        value = Path(value)
-                    temp_dict[key] = value
-                mast_dict[main_key]["Variable_List"] = temp_dict
+                        var_list = []
+                        _ = item.split(": ")
+                        main_key = "%s" % _[1].replace("\r\n", "")
+                        main_key = main_key.replace("\n", "")
+                        mast_dict[main_key] = {}
+                        mast_dict[main_key]["Job Id"] = "%s" % _[1]
+                    elif "    " in item and any(kw in item for kw in list(qstat_keywords["Job Id"].keys()) + list(qstat_keywords["Job Id"]["Variable_List"].keys())) or item == "\n":
+                        #print(f'spaces:{item}')
+                        item = item.replace("    ", "")
+                        if tab_flag is True:
+                            qstat_sentence = qstat_phrase + cont_phrase
+                            tab_flag = False
+                        elif qstat_phrase == prev_item:
+                            qstat_sentence = qstat_phrase
+
+                        if item != "\n":
+                            qstat_phrase = item
+                        else:
+                            print("New Job or end of file!")
+
+                    elif "\t" in item:
+                        tab_flag = True
+                        #print(f'tabs: {item}')
+                        cont_phrase = cont_phrase + item
+
+                    # For multi-line phrases
+                    if tab_flag is False:
+                        qstat_sentence = qstat_sentence.replace("\n\t", "")
+                        print(f'sentence:  {qstat_sentence}')
+                        cont_phrase = ""
+                        tab_flag = None
+                        qstat_list = qstat_sentence.split(" = ")
+                        key = qstat_list[0]
+                        value = qstat_list[1]
+                        if key == "Variable_List":
+                            value = value.split(",")
+                            temp_dict = dict(var.split("=") for var in value)
+                            for key, value in temp_dict.items():
+                                if value[0] == "/" or value[0] == "\\":
+                                    value = Path(value)
+                                temp_dict[key] = value
+                            mast_dict[main_key]["Variable_List"] = temp_dict
+                            temp_dict = {}
+                        else:
+                            mast_dict[main_key][key] = qstat_sentence.replace('\n', '')
+
+                    # For single line Phrases
+                    elif qstat_sentence:
+                        qstat_sentence = qstat_sentence.replace("\n\t", "")
+                        print(f'sentence: {qstat_sentence}')
+                        qstat_list = qstat_sentence.split(" = ")
+                        key = qstat_list[0]
+                        value = qstat_list[1]
+                        mast_dict[main_key][key] = qstat_sentence.replace('\n', '')
+                    qstat_sentence = None
+                    prev_item = item
         return mast_dict
+
+    # def qstat_parser(self):
+    #     mast_dict = {}
+    #     line_list = []
+    #     line_flag = False
+    #     sub_dict = {}
+    #     job_count = 0
+    #     with open(self.qstat_filename, 'r') as qf:
+    #         for item in qf.readlines():
+    #             print(f'item: {item}')
+    #             item = item.rstrip("\n")
+    #             item = item.rstrip("\r")
+    #             if "Job Id" in item:
+    #                 job_count += 1
+    #                 line_list = []
+    #                 _ = item.split(": ")
+    #                 main_key = "%s" % _[1].replace("\r\n", "")
+    #                 mast_dict[main_key] = {}
+    #                 mast_dict[main_key]["Job Id"] = "%s" % _[1]
+    #                 continue
+    #             elif item == "\n":
+    #                 continue
+    #             else:
+    #                 _ = item.split(" = ")
+    #                 if item == ['']:
+    #                     continue
+    #                 #print(_)
+    #                 if len(_) == 2:
+    #                     key = _[0].replace(" ", "")
+    #                     value = _[1].replace("\r\n", "")
+    #                     sub_dict[key] = value
+    #                     line_flag = False
+    #                     mast_dict[main_key] = sub_dict
+    #                 elif len(_) == 1:
+    #                     prev_key = key
+    #                     print(_)
+    #                     line_flag = True
+    #                     if len(line_list) == 0:
+    #                         line_list.append(value)
+    #                     line_list.append(_[0].replace("\r\n", "").replace(" ", "").replace("\t", ""))
+    #                     #print(line_list)
+    #                 if not line_flag and len(line_list) > 0:
+    #                     print(f'line_list1: {line_list}')
+    #                     line_string = ''.join(line_list)
+    #                     print(f'line_string: {line_string}')
+    #                     line_list = line_string.split(",")
+    #                     print(f'line_list2: {line_list}')
+    #                     print(f'key: {prev_key}')
+    #                     print(f'main_key: {main_key}')
+    #                     if prev_key == "Variable_List":
+    #                         temp_dict = dict(var.split("=") for var in line_list)
+    #                         print(f'temp_dict: {temp_dict}')
+    #                         for key, value in temp_dict.items():
+    #                             if value[0] == "/" or value[0] == "\\":
+    #                                 value = Path(value)
+    #                             temp_dict[key] = value
+    #                         sub_dict[prev_key] = temp_dict
+    #                     else:
+    #                         sub_dict[prev_key] = line_list[0]
+    #                     mast_dict[main_key] = sub_dict
+    #                     line_list = []
+    #                 continue
+    #     return mast_dict
 
     def filter_jobs(self, job_dict):
         kept_jobs = []
