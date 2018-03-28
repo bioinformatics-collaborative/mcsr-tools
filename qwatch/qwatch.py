@@ -56,13 +56,14 @@ class Qwatch(object):
     def full_workflow(self, parse, process, data, metadata, watch):
         if parse:
             self.parse_qstat_data()
-            if process:
-                self.process_jobs(watch_flag=watch)
+            if metadata or data:
                 if metadata:
                     _data = self.get_metadata()
                 if data:
-                    _data = self.get_qstat_data()
+                    _data = self.get_qstat_data(watch_flag=watch)
                 return _data
+            elif process:
+                self.process_jobs(watch_flag=watch)
 
     def initialize_data_files(self):
 
@@ -204,9 +205,9 @@ class Qwatch(object):
                     prev_item = item
         return mast_dict
 
-    def get_qstat_data(self):
+    def get_qstat_data(self, watch_flag=False):
         if not self.yaml_filename.is_file():
-            self.process_jobs()
+            self.process_jobs(watch_flag=watch_flag)
         with open(self.yaml_filename, 'r') as yf:
             jobs_dict = yaml.load(yf)
         return jobs_dict
@@ -270,6 +271,14 @@ class Qwaiter(Qwatch):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.qwatch = Qwatch
+
+    def _get_subset_kwargs(self, skipped_kwargs):
+        _kwargs = {}
+        for var, attr in self.__dict__.items():
+            if var not in skipped_kwargs:
+                _kwargs[var] = attr
+        return _kwargs
 
     def watch_jobs(self):
         ioloop = asyncio.get_event_loop()
@@ -282,9 +291,11 @@ class Qwaiter(Qwatch):
         tasks = [asyncio.ensure_future(self._async_watch(job)) for job in self.jobs]
         await asyncio.wait(tasks)
 
-    async def _async_watch(self, job_id, sleeper = 120):
+    async def _async_watch(self, job_id, sleeper=120):
         """Wait until a job or list of jobs finishes and get updates."""
-        job_dict = self.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
+        _kwargs = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory"])
+        watch_one = self.qwatch(jobs=[job_id], directory=f'{job_id}', **_kwargs)
+        job_dict = watch_one.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
 
         if job_dict[job_id]['job_state'] == 'Q':
             yield 'Waiting for %s to start running.' % job_id
