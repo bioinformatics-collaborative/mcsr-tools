@@ -296,6 +296,14 @@ class Qwaiter(Qwatch):
                 _kwargs[var] = attr
         return _kwargs
 
+    def update_csv(self, file, data):
+        if file.is_file():
+            file_df = pd.read_csv(file)
+            updated_df = pd.concat([file_df, data], axis=1)
+            updated_df.to_csv(file)
+        else:
+            data.to_csv(file)
+
     def watch_jobs(self):
         ioloop = asyncio.get_event_loop()
         ioloop.run_until_complete(self._async_watch_jobs())
@@ -312,8 +320,10 @@ class Qwaiter(Qwatch):
         _kwargs = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory"])
         watch_one = self.qwatch(jobs=[job_id], directory=f'{job_id}', **_kwargs)
         job_dict = watch_one.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
-        md = watch_one.get_dataframes()
-
+        md = watch_one.get_metadata_df(watch_flag=True)
+        ev = watch_one.get_pbs_env_df(watch_flag=True)
+        self.update_csv(file=self.metadata_filename, data=md)
+        self.update_csv(file=self.vl_metadata_filename, data=ev)
 
         if job_dict[job_id]['job_state'] == 'Q':
             yield 'Waiting for %s to start running.' % job_id
