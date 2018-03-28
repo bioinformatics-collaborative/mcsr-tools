@@ -8,7 +8,10 @@ from tempfile import TemporaryFile
 from pathlib import Path
 import pandas as pd
 from collections import OrderedDict
+import random
 from time import sleep
+import asyncio
+from pprint import pprint
 import getpass
 import re
 
@@ -232,7 +235,7 @@ class Qwatch(object):
             for keyword in df[job].keys():
                 if keyword != 'Variable_List':
                     md_df[job][keyword] = df[job][keyword]
-        from pprint import pprint
+
         master_df["Variable_Lists"] = pd.DataFrame.from_dict(vl_df)
         master_df["Metadata"] = pd.DataFrame.from_dict(md_df)
         pprint(vl_df)
@@ -261,10 +264,6 @@ class Qwatch(object):
         kept_jobs = list(set(kept_jobs))
         kept_dict = OrderedDict((k, job_dict[k]) for k in kept_jobs)
         return kept_jobs, kept_dict
-
-import random
-from time import sleep
-import asyncio
 
 
 class Qwaiter(Qwatch):
