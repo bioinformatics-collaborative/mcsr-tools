@@ -58,7 +58,7 @@ class Qwatch(object):
             self.parse_qstat_data()
             if metadata or data:
                 if metadata:
-                    _data = self.get_metadata()
+                    _data = self.get_dataframes()
                 if data:
                     _data = self.get_qstat_data(watch_flag=watch)
                 return _data
@@ -206,14 +206,22 @@ class Qwatch(object):
         return mast_dict
 
     def get_qstat_data(self, watch_flag=False):
-        if not self.yaml_filename.is_file():
+        if not self.yaml_filename.is_file() or watch_flag is True:
             self.process_jobs(watch_flag=watch_flag)
-        with open(self.yaml_filename, 'r') as yf:
-            jobs_dict = yaml.load(yf)
+            with open(self.yaml_filename, 'r') as yf:
+                jobs_dict = yaml.load(yf)
+        else:
+            with open(self.yaml_filename, 'r') as yf:
+                test = yaml.load(yf)
+                if not test:
+                    self.process_jobs()
+                    with open(self.yaml_filename, 'w') as yf:
+                        jobs_dict = yaml.load(yf)
         return jobs_dict
 
-    def get_metadata(self):
-        jobs_dict = self.get_qstat_data()
+    def get_dataframes(self, watch_flag=False):
+        jobs_dict = self.get_qstat_data(watch_flag=watch_flag)
+        print(jobs_dict)
         df = OrderedDict()
         master_df = OrderedDict()
         vl_df = OrderedDict()
@@ -239,11 +247,19 @@ class Qwatch(object):
 
         master_df["Variable_Lists"] = pd.DataFrame.from_dict(vl_df)
         master_df["Metadata"] = pd.DataFrame.from_dict(md_df)
-        pprint(vl_df)
-        pprint(md_df)
-        print(pd.DataFrame.from_dict(vl_df))
-        print(pd.DataFrame.from_dict(md_df))
+        #pprint(vl_df)
+        #pprint(md_df)
+        #print(pd.DataFrame.from_dict(vl_df))
+        #print(pd.DataFrame.from_dict(md_df))
         return master_df
+
+    def get_metadata_df(self, watch_flag=False):
+        master_df = self.get_dataframes(watch_flag=watch_flag)
+        return master_df["Metadata"]
+
+    def get_pbs_env_df(self, watch_flag=False):
+        master_df = self.get_dataframes(watch_flag=watch_flag)
+        return master_df["Variable_Lists"]
 
     def filter_jobs(self, job_dict):
         kept_jobs = []
@@ -296,6 +312,8 @@ class Qwaiter(Qwatch):
         _kwargs = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory"])
         watch_one = self.qwatch(jobs=[job_id], directory=f'{job_id}', **_kwargs)
         job_dict = watch_one.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
+        md = watch_one.get_dataframes()
+
 
         if job_dict[job_id]['job_state'] == 'Q':
             yield 'Waiting for %s to start running.' % job_id
