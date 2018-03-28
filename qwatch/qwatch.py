@@ -4,7 +4,7 @@ import click
 import subprocess
 import yaml
 import random
-from tempfile import TemporaryFile
+import tempfile
 from pathlib import Path
 import pandas as pd
 from collections import OrderedDict
@@ -40,7 +40,12 @@ class Qwatch(object):
         self.directory = directory
         self.filename_pattern = filename_pattern
         self.qstat_filename = Path()
-        self.yaml_filename, self.metadata_filename, self.vl_metadata_filename, self.plot_filename = Path(), Path(), Path(), Path()
+        self.yaml_filename = Path()
+        self.metadata_filename = Path()
+        self.vl_metadata_filename = Path()
+        self.resource_metadata_filename = Path()
+        self.time_metadata_filename = Path()
+        self.plot_filename = Path()
         self._yaml_config = "qwatch/qstat_dict.yml"
         self.initialize_data_files()
         self._setup_yaml()
@@ -58,7 +63,7 @@ class Qwatch(object):
             self.parse_qstat_data()
             if metadata or data:
                 if metadata:
-                    _data = self.get_dataframes()
+                    _data = self.get_dicts()
                 if data:
                     _data = self.get_qstat_data(watch_flag=watch)
                 return _data
@@ -85,6 +90,8 @@ class Qwatch(object):
         self.yaml_filename = Path(self.directory) / Path(f"{filename_pattern}.yml")
         self.metadata_filename = Path(self.directory) / Path(f"{filename_pattern}_metadata.csv")
         self.vl_metadata_filename = Path(self.directory) / Path(f"{filename_pattern}_vl_metadata.csv")
+        self.resource_metadata_filename = Path(self.directory) / Path(f"{filename_pattern}_resource_metadata.csv")
+        self.time_metadata_filename = Path(self.directory) / Path(f"{filename_pattern}_time_metadata.csv")
         self.plot_filename = Path(self.directory) / Path(f"{filename_pattern}.png")
 
     def parse_qstat_data(self):
@@ -219,13 +226,15 @@ class Qwatch(object):
                         jobs_dict = yaml.load(yf)
         return jobs_dict
 
-    def get_dataframes(self, watch_flag=False):
+    def get_dicts(self, watch_flag=False):
         jobs_dict = self.get_qstat_data(watch_flag=watch_flag)
         print(jobs_dict)
         df = OrderedDict()
-        master_df = OrderedDict()
-        vl_df = OrderedDict()
-        md_df = OrderedDict()
+        master_dict = OrderedDict()
+        vl_dict = OrderedDict()
+        md_dict = OrderedDict()
+        res_dict = OrderedDict()
+        time_dict = OrderedDict()
         for job in jobs_dict.keys():
             row = OrderedDict()
             _job = OrderedDict()
@@ -239,27 +248,97 @@ class Qwatch(object):
             df.update(_job)
         # Rework this
         for job in df.keys():
-            vl_df[job] = df[job]['Variable_List']
-            md_df[job] = OrderedDict()
+            vl_dict[job] = df[job]['Variable_List']
+            md_dict[job] = OrderedDict()
+            res_dict[job] = OrderedDict()
+            time_dict[job] = OrderedDict()
             for keyword in df[job].keys():
-                if keyword != 'Variable_List':
-                    md_df[job][keyword] = df[job][keyword]
+                if "resource" in keyword.lower():
+                    res_dict[job][keyword] = df[job][keyword]
+                elif "time" in keyword.lower():
+                    time_dict[job][keyword] = df[job][keyword]
+                elif keyword != 'Variable_List':
+                    md_dict[job][keyword] = df[job][keyword]
 
-        master_df["Variable_Lists"] = pd.DataFrame.from_dict(vl_df)
-        master_df["Metadata"] = pd.DataFrame.from_dict(md_df)
+        master_dict["Variable_List"] = vl_dict
+        master_dict["Metadata"] = md_dict
+        master_dict["Resources"] = res_dict
+        master_dict["Time"] = time_dict
+        return master_dict
+
+    def get_dataframes(self, watch_flag=False):
+        master_dict = self.get_dicts(watch_flag=watch_flag)
+        master_df = OrderedDict()
+        for key in master_dict.keys():
+            master_df[key] = pd.DataFrame.from_dict(master_dict[key])
+
         #pprint(vl_df)
         #pprint(md_df)
         #print(pd.DataFrame.from_dict(vl_df))
         #print(pd.DataFrame.from_dict(md_df))
         return master_df
 
-    def get_metadata_df(self, watch_flag=False):
-        master_df = self.get_dataframes(watch_flag=watch_flag)
-        return master_df["Metadata"]
+    def get_metadata(self, watch_flag=False, data_frame=False):
+        if data_frame:
+            _data = self.get_dataframes(watch_flag=watch_flag)
+        else:
+            _data = self.get_dicts(watch_flag=watch_flag)
+        return _data["Metadata"]
 
-    def get_pbs_env_df(self, watch_flag=False):
-        master_df = self.get_dataframes(watch_flag=watch_flag)
-        return master_df["Variable_Lists"]
+    def get_pbs_env(self, watch_flag=False, data_frame=False):
+        if data_frame:
+            _data = self.get_dataframes(watch_flag=watch_flag)
+        else:
+            _data = self.get_dicts(watch_flag=watch_flag)
+        return _data["Variable_Lists"]
+
+    def get_resources(self, watch_flag=False, data_frame=False):
+        if data_frame:
+            _data = self.get_dataframes(watch_flag=watch_flag)
+        else:
+            _data = self.get_dicts(watch_flag=watch_flag)
+        return _data["Resources"]
+
+    def get_time(self, watch_flag=False, data_frame=False):
+        if data_frame:
+            _data = self.get_dataframes(watch_flag=watch_flag)
+        else:
+            _data = self.get_dicts(watch_flag=watch_flag)
+        return _data["Time"]
+
+        # master_df = self.get_dicts(watch_flag=watch_flag)
+        # allocated_resources = ["Resource_List.mem", "Resource_List.mpiprocs", "Resource_List.nodect", "Resource_List.nodes", "Resource_List.place", "Resource_List.select", "Resource_List.walltime"]
+        # used_resources = ["resources_used.cpupercent", "resources_used.cput", "resources_used.mem", "resources_used.ncpus", "resources_used.vmem", "resources_used.walltime"]
+        # time_dict = {"creation": "ctime",
+        #              "queued": "qtime",
+        #              "eligible_to_run": "etime",
+        #              "started_running": "stime",
+        #              "modification": "mtime"}
+        #
+        # match = re.match(r"([a-z]+)([0-9]+)", 'foofo21', re.I)
+        # if match:
+        #     item = match.groups()
+
+        # Resource_List.mem = 16777216kb
+        # Resource_List.mpiprocs = 16
+        # Resource_List.ncpus = 16
+        # Resource_List.nodect = 1
+        # Resource_List.nodes = 1:ppn=16
+        # Resource_List.place = scatter
+        # Resource_List.select = 1:ncpus=16:mem=16777216KB:mpiprocs=16
+        # Resource_List.walltime = 9999:00:00
+
+        # resources_used.cpupercent = 829
+        # resources_used.cput = 01:50:15
+        # resources_used.mem = 2828700kb
+        # resources_used.ncpus = 16
+        # resources_used.vmem = 56230484kb
+        # resources_used.walltime = 00:13:25
+
+        # ctime: Time job was created -- unlike what I reported initially, this attribute exists. Not sure whether ctime or qtime are what saga needs to know
+        # etime: Time job became eligible to run -- NOT the end time!
+        # qtime: Time job was queued
+        # stime: Time job started to run
 
     def filter_jobs(self, job_dict):
         kept_jobs = []
@@ -312,18 +391,27 @@ class Qwaiter(Qwatch):
     async def _async_watch_jobs(self):
         self.parse_qstat_data()
         self.process_jobs(watch_flag=True)
-        tasks = [asyncio.ensure_future(self._async_watch(job)) for job in self.jobs]
+        with tempfile.TemporaryDirectory() as tempdir:
+            dir = Path(tempdir)
+            tasks = [asyncio.ensure_future(self._async_watch(job_id=job, directory=dir)) for job in self.jobs]
+            files = os.listdir(dir)
+
+
         await asyncio.wait(tasks)
 
-    async def _async_watch(self, job_id, sleeper=120):
+    async def _async_watch(self, job_id, directory, sleeper=120):
         """Wait until a job or list of jobs finishes and get updates."""
         _kwargs = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory"])
-        watch_one = self.qwatch(jobs=[job_id], directory=f'{job_id}', **_kwargs)
+        watch_one = self.qwatch(jobs=[job_id], directory=directory, **_kwargs)
         job_dict = watch_one.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
-        md = watch_one.get_metadata_df(watch_flag=True)
-        ev = watch_one.get_pbs_env_df(watch_flag=True)
+        md = watch_one.get_metadata(watch_flag=True, data_frame=True)
+        ev = watch_one.get_pbs_env(watch_flag=True, data_frame=True)
+        tm = watch_one.get_time(watch_flag=True, data_frame=True)
+        rs = watch_one.get_resources(watch_flag=True, data_frame=True)
         self.update_csv(file=self.metadata_filename, data=md)
         self.update_csv(file=self.vl_metadata_filename, data=ev)
+        self.update_csv(file=self.time_metadata_filename, data=tm)
+        self.update_csv(file=self.resource_metadata_filename, data=rs)
 
         if job_dict[job_id]['job_state'] == 'Q':
             yield 'Waiting for %s to start running.' % job_id
