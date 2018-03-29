@@ -390,7 +390,10 @@ class Qwaiter(Qwatch):
         self.process_jobs(watch_flag=True)
         kw_dict = {}
         kw_dict["jobs"] = self.jobs
-        kw_dict["kwargs"] = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory", "qwatch", "_yaml_config"])
+        kw_dict["kwargs"] = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory", "qwatch", "_yaml_config",
+                                                                    "metadata_filename", "plot_filename", "qstat_filename",
+                                                                    "resource_metadata_filename", "time_metadata_filename",
+                                                                    "vl_metadata_filename", "yaml_filename"])
         kw_dict["sleeper"] = 120
         with open('temp_yaml.yml', 'w') as ty:
             yaml.dump(kw_dict, stream=ty, default_flow_style=False)
