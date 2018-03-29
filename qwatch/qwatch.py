@@ -11,6 +11,8 @@ from collections import OrderedDict
 import random
 from time import sleep
 import asyncio
+import plotly.plotly as py
+import plotly.graph_objs as go
 from pprint import pprint
 import getpass
 import re
@@ -74,15 +76,15 @@ class Qwatch(object):
 
         if not self.filename_pattern:
             if self.infile:
-                filename_pattern = f"{self.infile}_qstat_data"
+                filename_pattern = f"{self.infile}"
             elif len(self.users) == 1 and len(self.jobs) == 0:
-                filename_pattern = f"{self.users[0]}_qstat_data"
+                filename_pattern = f"{self.users[0]}"
             elif len(self.jobs) == 1 and len(self.users) == 0:
-                filename_pattern = f"{self.jobs[0]}_qstat_data"
+                filename_pattern = f"{self.jobs[0]}"
             else:
                 current_user = os.getlogin()
                 _id = random.randint(10000, 99999)
-                filename_pattern = f"{current_user}_{_id}_qstat_data"
+                filename_pattern = f"{current_user}_{_id}"
         self.filename_pattern = filename_pattern
 
         # Create file names using the pattern
@@ -388,20 +390,26 @@ class Qwaiter(Qwatch):
         ioloop.run_until_complete(self._async_watch_jobs())
         ioloop.close()
 
+    def plot_memory(self):
+        pass
+
     async def _async_watch_jobs(self):
         self.parse_qstat_data()
         self.process_jobs(watch_flag=True)
-        with tempfile.TemporaryDirectory() as tempdir:
-            dir = Path(tempdir)
-            tasks = [asyncio.ensure_future(self._async_watch(job_id=job, directory=dir)) for job in self.jobs]
-            files = os.listdir(dir)
+        # with tempfile.TemporaryDirectory() as tempdir:
 
+        dir = Path(os.getcwd()) / Path('qwait_test')
+        tasks = [asyncio.ensure_future(self._async_watch(job_id=job, directory=dir)) for job in self.jobs]
+        # dirs = os.listdir(dir)
+        # for folder in dirs:
+        #     d = dir / Path(folder)
 
         await asyncio.wait(tasks)
 
     async def _async_watch(self, job_id, directory, sleeper=120):
         """Wait until a job or list of jobs finishes and get updates."""
         _kwargs = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory"])
+        directory = directory / Path(job_id)
         watch_one = self.qwatch(jobs=[job_id], directory=directory, **_kwargs)
         job_dict = watch_one.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
         md = watch_one.get_metadata(watch_flag=True, data_frame=True)
