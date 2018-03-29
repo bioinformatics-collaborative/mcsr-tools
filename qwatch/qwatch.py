@@ -349,7 +349,7 @@ class Qwatch(object):
             print('if')
             for j in job_dict.keys():
                 if len(self.users) > 0:
-                    if job_dict[j]["Job_Owner"] in self.users:
+                    if job_dict[j]["Variable_List"]["PBS_O_LOGNAME"] in self.users:
                         print(j)
                         kept_jobs.append(j)
                 elif len(self.jobs) > 0:
