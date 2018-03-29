@@ -293,7 +293,7 @@ class Qwatch(object):
             _data = self.get_dataframes(watch_flag=watch_flag)
         else:
             _data = self.get_dicts(watch_flag=watch_flag)
-        return _data["Variable_Lists"]
+        return _data["Variable_List"]
 
     def get_resources(self, watch_flag=False, data_frame=False):
         if data_frame:
