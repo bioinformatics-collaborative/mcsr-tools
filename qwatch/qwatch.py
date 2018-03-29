@@ -75,6 +75,7 @@ class Qwatch(object):
     def initialize_data_files(self):
 
         if not self.filename_pattern:
+            print("not_fnp")
             if self.infile:
                 filename_pattern = f"{self.infile}"
             elif len(self.users) == 1 and len(self.jobs) == 0:
@@ -85,7 +86,7 @@ class Qwatch(object):
                 current_user = os.getlogin()
                 _id = random.randint(10000, 99999)
                 filename_pattern = f"{current_user}_{_id}"
-        self.filename_pattern = filename_pattern
+            self.filename_pattern = filename_pattern
 
         # Create file names using the pattern
         Path(self.directory).mkdir(parents=True, exist_ok=True)
