@@ -49,7 +49,7 @@ async def _async_watch_jobs(jobs, sleeper, **kwargs):
     print(f'async_jobs:{jobs}')
     print(f'async_kwargs:{kwargs}')
     dir = Path(os.getcwd()) / Path('qwait_test')
-    tasks = [_async_watch(job_id=job, directory=dir, sleeper=sleeper, **kwargs) for job in jobs]
+    tasks = [await _async_watch(job_id=job, directory=dir, sleeper=sleeper, **kwargs) for job in jobs]
     result = await asyncio.gather(tasks)
     for r in result:
         print(r)
