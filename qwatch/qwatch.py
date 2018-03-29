@@ -396,8 +396,8 @@ class Qwaiter(Qwatch):
         qstat = subprocess.Popen('python3.6 waiter.py -yamlfile temp_yaml.yml', stderr=subprocess.PIPE,
                                  stdout=subprocess.PIPE, shell=True,
                                  encoding='utf-8', universal_newlines=False)
-        out = qstat.stdout.readlines()
-        error = qstat.stderr.readlines()
+        out = qstat.stdout.read()
+        error = qstat.stderr.read()
         print(f'out: {out}')
         print(f'error: {error}')
 
