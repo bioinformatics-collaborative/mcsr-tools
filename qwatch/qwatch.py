@@ -48,7 +48,7 @@ class Qwatch(object):
         self.resource_metadata_filename = Path()
         self.time_metadata_filename = Path()
         self.plot_filename = Path()
-        self._yaml_config = "qwatch/qstat_dict.yml"
+        self._yaml_config = "qstat_dict.yml"
         self.initialize_data_files()
         self._setup_yaml()
 
