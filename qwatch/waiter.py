@@ -1,136 +1,56 @@
+import os
+import asyncio
+from pathlib import Path
 from time import sleep
-import getpass
-import re
-import subprocess
-import click
+import importlib.util
+import argparse
+import yaml
+spec = importlib.util.spec_from_file_location(".", "./qwatch.py")
+qwatch = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(qwatch)
 
-@click.command()
-@click.command("--job")
-@click.option("--plot", default=False)
-@click.option("--notify", default=False)
-def waiter(job, plot, notify):
-    Qstat().wait_on_job_completion(job)
-    # Add the following to wait_on_job_completion
-        # slack/email notification
-        # notification time gap
-        #
-    if plot:
-        for file in plot:
-            # Plot the files with plotly?
-            pass
-    if notify:
-        # Get strategy (email and/or slack)
-        if plot:
-            # Send plots and .csv file with notification
-            pass
-        pass
+parser = argparse.ArgumentParser(description='A job watcher.')
+
+parser.add_argument('-yamlfile', action="store", dest="yamlfile")
+_ = parser.parse_args()
+yfile = _.yamlfile
+with open(yfile, 'r') as yf:
+    _kwargs = yaml.load(yf)
 
 
-"""Access qstat information about SGE jobs."""
-class Qstat(object):
-    def __init__(self):
-        """Initialize class."""
-        _username = getpass.getuser()
-        self.username = _username
-        self.split_regex = re.compile(r'\s+')
+async def _async_watch_jobs(jobs, sleeper, **kwargs):
 
-    def qstatinfo(self, qstat_path='qstat'):
-        """Retrieve qstat output."""
-        try:
-            qstatinfo = subprocess.check_output([qstat_path])
-        except subprocess.CalledProcessError as cpe:
-            return_code = 'qstat returncode: %s' % cpe.returncode
-            std_error = 'qstat standard output: %s' % cpe.stderr
-            print(return_code + '\n' + std_error)
-        except FileNotFoundError:
-            raise FileNotFoundError('qstat is not on your machine.')
+    # with tempfile.TemporaryDirectory() as tempdir:
+    print(jobs)
+    dir = Path(os.getcwd()) / Path('qwait_test')
+    tasks = [asyncio.ensure_future(_async_watch(job_id=job, directory=dir, sleeper=sleeper, **kwargs))
+             for job in jobs]
+    await asyncio.wait(tasks)
 
-        jobs = self._output_parser(qstatinfo)
 
-        return jobs
+async def _async_watch(job_id, directory, sleeper=120, **kwargs):
+    """Wait until a job or list of jobs finishes and get updates."""
+    directory = directory / Path(job_id)
+    watch_one = qwatch.Qwaiter(jobs=[job_id], directory=directory, **kwargs)
+    job_dict = watch_one.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
+    md = watch_one.get_metadata(watch_flag=True, data_frame=True)
+    ev = watch_one.get_pbs_env(watch_flag=True, data_frame=True)
+    tm = watch_one.get_time(watch_flag=True, data_frame=True)
+    rs = watch_one.get_resources(watch_flag=True, data_frame=True)
+    watch_one.update_csv(file=watch_one.metadata_filename, data=md)
+    watch_one.update_csv(file=watch_one.vl_metadata_filename, data=ev)
+    watch_one.update_csv(file=watch_one.time_metadata_filename, data=tm)
+    watch_one.update_csv(file=watch_one.resource_metadata_filename, data=rs)
 
-    def _output_parser(self, output):
-        """Parse output from qstat pbs commandline program.
-        Returns a list of dictionaries for each job.
-        """
-        lines = output.decode('utf-8').split('\n')
-        del lines[:5]
-        jobs = []
-        for line in lines:
-            els = self.split_regex.split(line)
-            try:
-                j = {"job_id": els[0], "name": els[1], "user": els[2], "elapsed_time": els[3],
-                     "status": els[4], "queue": els[5]}
-                jobs.append(j)
+    if job_dict[job_id]['job_state'] == 'Q':
+        yield 'Waiting for %s to start running.' % job_id
+        sleep(sleeper)
+        _async_watch(job_id, directory, sleeper, **kwargs)
+    elif job_dict[job_id]['job_state'] == 'R':
+        yield 'Waiting for %s to finish running.' % job_id
+        sleep(sleeper)
+        _async_watch(job_id, directory, sleeper, **kwargs)
 
-            except IndexError:
-                pass
-
-        return jobs
-
-    def all_job_ids(self):
-        """Retrieve a list of all jobs running or queued."""
-        jobs = self.qstatinfo()
-        ids = [j['job_id'] for j in jobs]
-        return ids
-
-    def all_running_jobs(self):
-        """Retrieve a list of running jobs."""
-        jobs = self.qstatinfo()
-        ids = [j['job_id'] for j in jobs if j['status'] == 'R']
-        return ids
-
-    def all_queued_jobs(self):
-        """Retrieve a list of queued jobs."""
-        jobs = self.qstatinfo()
-        ids = [j['job_id'] for j in jobs if j['status'] == 'Q']
-        return ids
-
-    def myjobs(self):
-        """Retrieve a list of all the current user's jobs."""
-        jobs = self.qstatinfo()
-        ids = [j['job_id'] for j in jobs if j['user'] == self.username]
-        if len(ids) < 1:
-            return 'You have no jobs running or queued.'
-        else:
-            rids = [j['job_id'] for j in jobs if j['user'] == self.username
-                    and j['status'] == 'R']
-            qids = [j['job_id'] for j in jobs if j['user'] == self.username
-                    and j['status'] == 'Q']
-            return 'Running jobs: %s\nQueued jobs: %s' % (rids, qids)
-
-    def watch(self, job_id):
-        """Wait until a job or list of jobs finishes and get updates."""
-        jobs = self.qstatinfo()
-        rids = [j['job_id'] for j in jobs if j['job_id'] == job_id
-                and j['status'] == 'R']
-        qids = [j['job_id'] for j in jobs if j['job_id'] == job_id
-                and j['status'] == 'Q']
-        if job_id in qids:
-            yield 'Waiting for %s to start running.' % job_id
-            self.watch(job_id)
-        elif job_id in rids:
-            yield 'Waiting for %s to finish running.' % job_id
-            self.watch(job_id)
-        else:
-            return 'Job id not found.'
-
-    def wait_on_job_completion(self, job_id):
-        """Use Qstat to monitor your job."""
-        # TODO Allow either slack notifications or email or text.
-        qwait = Qstat().watch(job_id)
-        if qwait == 'Job id not found.':
-            self.sgejob_log.info('%s has finished.' % job_id)
-            sleep(30)
-        elif qwait == 'Waiting for %s to start running.' % job_id:
-            self.sgejob_log.info('%s is queued to run.' % job_id)
-            self.sgejob_log.info('Waiting for %s to start.' % job_id)
-            sleep(30)
-            self.wait_on_job_completion(job_id)
-        elif qwait == 'Waiting for %s to finish running.' % job_id:
-            self.sgejob_log.info('%s is running.' % job_id)
-            self.sgejob_log.info('Waiting for %s to finish.' % job_id)
-            sleep(30)
-            self.wait_on_job_completion(job_id)
-        else:
-            self.wait_on_job_completion(job_id)
+ioloop = asyncio.get_event_loop()
+ioloop.run_until_complete(_async_watch_jobs(jobs=_kwargs["jobs"], sleeper=_kwargs["sleeper"], **_kwargs["kwargs"]))
+ioloop.close()

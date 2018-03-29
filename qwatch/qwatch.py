@@ -386,9 +386,20 @@ class Qwaiter(Qwatch):
             data.to_csv(file)
 
     def watch_jobs(self):
-        ioloop = asyncio.get_event_loop()
-        ioloop.run_until_complete(self._async_watch_jobs())
-        ioloop.close()
+        kw_dict = {}
+        kw_dict["jobs"] = self.jobs
+        kw_dict["kwargs"] = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory"])
+        kw_dict["sleeper"] = 120
+        with open('temp_yaml.yml', 'w') as ty:
+            yaml.dump(kw_dict, stream=ty, default_flow_style=False)
+
+        qstat = subprocess.Popen('python3.6 waiter.py -yamlfile temp_yaml.yml', stderr=subprocess.PIPE,
+                                 stdout=subprocess.PIPE, shell=True,
+                                 encoding='utf-8', universal_newlines=False)
+        out = qstat.stdout.readlines()
+        error = qstat.stderr.readlines()
+        print(f'out: {out}')
+        print(f'error: {error}')
 
     def plot_memory(self):
         pass
