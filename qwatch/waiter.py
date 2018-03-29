@@ -21,7 +21,8 @@ with open(yfile, 'r') as yf:
 async def _async_watch_jobs(jobs, sleeper, **kwargs):
 
     # with tempfile.TemporaryDirectory() as tempdir:
-    print(jobs)
+    print(f'async_jobs:{jobs}')
+    print(f'async_kwargs:{kwargs}')
     dir = Path(os.getcwd()) / Path('qwait_test')
     tasks = [asyncio.ensure_future(_async_watch(job_id=job, directory=dir, sleeper=sleeper, **kwargs))
              for job in jobs]
