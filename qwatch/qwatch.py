@@ -113,11 +113,11 @@ class Qwatch(object):
     def process_jobs(self, watch_flag=False):
         # Parse the qstat file and create a dictionary object
         job_dict = self.qstat_parser()
-        print(job_dict)
+        #print(job_dict)
         # Filter and keep only the selected jobs and then create a YAML file
         kept_jobs, kept_dict = self.filter_jobs(job_dict)
         print(f'jobs: {kept_jobs}')
-        print(f'dict: {kept_dict}')
+        #print(f'dict: {kept_dict}')
         if not self.yaml_filename.is_file() or watch_flag is True:
             self.jobs = kept_jobs
             with open(self.yaml_filename, 'w') as yf:
@@ -397,7 +397,7 @@ class Qwaiter(Qwatch):
         self.parse_qstat_data()
         self.process_jobs(watch_flag=True)
         # with tempfile.TemporaryDirectory() as tempdir:
-
+        print(self.jobs)
         dir = Path(os.getcwd()) / Path('qwait_test')
         tasks = [asyncio.ensure_future(self._async_watch(job_id=job, directory=dir)) for job in self.jobs]
         # dirs = os.listdir(dir)
