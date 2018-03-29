@@ -18,17 +18,6 @@ with open(yfile, 'r') as yf:
     _kwargs = yaml.load(yf)
 
 
-async def _async_watch_jobs(jobs, sleeper, **kwargs):
-
-    # with tempfile.TemporaryDirectory() as tempdir:
-    print(f'async_jobs:{jobs}')
-    print(f'async_kwargs:{kwargs}')
-    dir = Path(os.getcwd()) / Path('qwait_test')
-    tasks = [asyncio.ensure_future(_async_watch(job_id=job, directory=dir, sleeper=sleeper, **kwargs))
-             for job in jobs]
-    await asyncio.wait(tasks)
-
-
 async def _async_watch(job_id, directory, sleeper=120, **kwargs):
     """Wait until a job or list of jobs finishes and get updates."""
     directory = directory / Path(job_id)
@@ -51,6 +40,18 @@ async def _async_watch(job_id, directory, sleeper=120, **kwargs):
         yield 'Waiting for %s to finish running.' % job_id
         sleep(sleeper)
         _async_watch(job_id, directory, sleeper, **kwargs)
+
+
+async def _async_watch_jobs(jobs, sleeper, **kwargs):
+
+    # with tempfile.TemporaryDirectory() as tempdir:
+    print(f'async_jobs:{jobs}')
+    print(f'async_kwargs:{kwargs}')
+    dir = Path(os.getcwd()) / Path('qwait_test')
+    tasks = [asyncio.ensure_future(_async_watch(job_id=job, directory=dir, sleeper=sleeper, **kwargs))
+             for job in jobs]
+    await asyncio.wait(tasks)
+
 
 ioloop = asyncio.get_event_loop()
 ioloop.run_until_complete(_async_watch_jobs(jobs=_kwargs["jobs"], sleeper=_kwargs["sleeper"], **_kwargs["kwargs"]))
