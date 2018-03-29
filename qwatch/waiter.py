@@ -35,11 +35,11 @@ async def _async_watch(job_id, directory, sleeper=120, **kwargs):
     if job_dict[job_id]['job_state'] == 'Q':
         #yield 'Waiting for %s to start running.' % job_id
         sleep(sleeper)
-        _async_watch(job_id, directory, sleeper, **kwargs)
+        await _async_watch(job_id, directory, sleeper, **kwargs)
     elif job_dict[job_id]['job_state'] == 'R':
         #yield 'Waiting for %s to finish running.' % job_id
         sleep(sleeper)
-        _async_watch(job_id, directory, sleeper, **kwargs)
+        await _async_watch(job_id, directory, sleeper, **kwargs)
     return f'Finished {job_id}'
 
 
@@ -50,7 +50,7 @@ async def _async_watch_jobs(jobs, sleeper, **kwargs):
     print(f'async_kwargs:{kwargs}')
     dir = Path(os.getcwd()) / Path('qwait_test')
     tasks = [_async_watch(job_id=job, directory=dir, sleeper=sleeper, **kwargs) for job in jobs]
-    result = asyncio.gather(tasks)
+    result = await asyncio.gather(tasks)
     for r in result:
         print(r)
 
