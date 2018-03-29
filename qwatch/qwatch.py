@@ -87,7 +87,7 @@ class Qwatch(object):
                 _id = random.randint(10000, 99999)
                 filename_pattern = f"{current_user}_{_id}"
             self.filename_pattern = filename_pattern
-
+        filename_pattern = self.filename_pattern
         # Create file names using the pattern
         Path(self.directory).mkdir(parents=True, exist_ok=True)
         self.yaml_filename = Path(self.directory) / Path(f"{filename_pattern}.yml")
