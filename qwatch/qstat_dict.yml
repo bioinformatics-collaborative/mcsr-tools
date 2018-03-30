@@ -1,4 +1,5 @@
 Job Id:
+  Job_Id:
   Job_Name:
   Job_Owner:
   resources_used.cpupercent:
@@ -47,7 +48,7 @@ Job Id:
     PBS_O_WORKDIR:
     PBS_O_LANG:
     PBS_O_PATH:
-    PBS_O_MAIL=:
+    PBS_O_MAIL:
     PBS_O_QUEUE:
     PBS_O_HOST:
   comment:
