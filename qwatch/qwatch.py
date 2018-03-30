@@ -60,17 +60,17 @@ class Qwatch(object):
         """ https://stackoverflow.com/a/8661021 """
         yaml.add_representer(OrderedDict, self.represent_dictionary_order)
 
-    def full_workflow(self, parse, process, data, metadata, watch):
+    def full_workflow(self, parse, process, data, metadata):
         if parse:
             self.parse_qstat_data()
             if metadata or data:
                 if metadata:
                     _data = self.get_dicts()
                 if data:
-                    _data = self.get_qstat_data(watch_flag=watch)
+                    _data = self.get_qstat_data()
                 return _data
             elif process:
-                self.process_jobs(watch_flag=watch)
+                self.process_jobs()
 
     def initialize_data_files(self):
 
@@ -111,7 +111,7 @@ class Qwatch(object):
                 qf.writelines(out)
             print(error)
 
-    def process_jobs(self, watch_flag=False):
+    def process_jobs(self):
         # Parse the qstat file and create a dictionary object
         job_dict = self.qstat_parser()
         #print(job_dict)
@@ -119,7 +119,7 @@ class Qwatch(object):
         kept_jobs, kept_dict = self.filter_jobs(job_dict)
         print(f'jobs: {kept_jobs}')
         #print(f'dict: {kept_dict}')
-        if not self.yaml_filename.is_file() or watch_flag is True:
+        if not self.yaml_filename.is_file() or self.watch is True:
             self.jobs = kept_jobs
             with open(self.yaml_filename, 'w') as yf:
                 yaml.dump(kept_dict, stream=yf, default_flow_style=False)
@@ -216,9 +216,9 @@ class Qwatch(object):
                     prev_item = item
         return mast_dict
 
-    def get_qstat_data(self, watch_flag=False):
-        if not self.yaml_filename.is_file() or watch_flag is True:
-            self.process_jobs(watch_flag=watch_flag)
+    def get_qstat_data(self):
+        if not self.yaml_filename.is_file() or self.watch is True:
+            self.process_jobs()
             with open(self.yaml_filename, 'r') as yf:
                 jobs_dict = yaml.load(yf)
         else:
@@ -230,8 +230,8 @@ class Qwatch(object):
                         jobs_dict = yaml.load(yf)
         return jobs_dict
 
-    def get_dicts(self, watch_flag=False):
-        jobs_dict = self.get_qstat_data(watch_flag=watch_flag)
+    def get_dicts(self):
+        jobs_dict = self.get_qstat_data()
         print(jobs_dict)
         df = OrderedDict()
         master_dict = OrderedDict()
@@ -270,8 +270,8 @@ class Qwatch(object):
         master_dict["Time"] = time_dict
         return master_dict
 
-    def get_dataframes(self, watch_flag=False):
-        master_dict = self.get_dicts(watch_flag=watch_flag)
+    def get_dataframes(self):
+        master_dict = self.get_dicts()
         master_df = OrderedDict()
         for key in master_dict.keys():
             master_df[key] = pd.DataFrame.from_dict(master_dict[key])
@@ -282,32 +282,32 @@ class Qwatch(object):
         #print(pd.DataFrame.from_dict(md_df))
         return master_df
 
-    def get_metadata(self, watch_flag=False, data_frame=False):
+    def get_metadata(self, data_frame=False):
         if data_frame:
-            _data = self.get_dataframes(watch_flag=watch_flag)
+            _data = self.get_dataframes()
         else:
-            _data = self.get_dicts(watch_flag=watch_flag)
+            _data = self.get_dicts()
         return _data["Metadata"]
 
-    def get_pbs_env(self, watch_flag=False, data_frame=False):
+    def get_pbs_env(self, data_frame=False):
         if data_frame:
-            _data = self.get_dataframes(watch_flag=watch_flag)
+            _data = self.get_dataframes()
         else:
-            _data = self.get_dicts(watch_flag=watch_flag)
+            _data = self.get_dicts()
         return _data["Variable_List"]
 
-    def get_resources(self, watch_flag=False, data_frame=False):
+    def get_resources(self, data_frame=False):
         if data_frame:
-            _data = self.get_dataframes(watch_flag=watch_flag)
+            _data = self.get_dataframes()
         else:
-            _data = self.get_dicts(watch_flag=watch_flag)
+            _data = self.get_dicts()
         return _data["Resources"]
 
-    def get_time(self, watch_flag=False, data_frame=False):
+    def get_time(self, data_frame=False):
         if data_frame:
-            _data = self.get_dataframes(watch_flag=watch_flag)
+            _data = self.get_dataframes()
         else:
-            _data = self.get_dicts(watch_flag=watch_flag)
+            _data = self.get_dicts()
         return _data["Time"]
 
         # master_df = self.get_dicts(watch_flag=watch_flag)
@@ -402,7 +402,7 @@ class Qwaiter(Qwatch):
 
     def watch_jobs(self):
         self.parse_qstat_data()
-        self.process_jobs(watch_flag=True)
+        self.process_jobs()
         kw_dict = {}
         kw_dict["jobs"] = self.jobs
         kw_dict["kwargs"] = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory", "qwatch", "_yaml_config",
@@ -423,40 +423,3 @@ class Qwaiter(Qwatch):
 
     def plot_memory(self):
         pass
-
-    async def _async_watch_jobs(self):
-        self.parse_qstat_data()
-        self.process_jobs(watch_flag=True)
-        # with tempfile.TemporaryDirectory() as tempdir:
-        print(self.jobs)
-        dir = Path(os.getcwd()) / Path('qwait_test')
-        tasks = [asyncio.ensure_future(self._async_watch(job_id=job, directory=dir)) for job in self.jobs]
-        # dirs = os.listdir(dir)
-        # for folder in dirs:
-        #     d = dir / Path(folder)
-
-        await asyncio.wait(tasks)
-
-    async def _async_watch(self, job_id, directory, sleeper=120):
-        """Wait until a job or list of jobs finishes and get updates."""
-        _kwargs = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory"])
-        directory = directory / Path(job_id)
-        watch_one = self.qwatch(jobs=[job_id], directory=directory, **_kwargs)
-        job_dict = watch_one.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
-        md = watch_one.get_metadata(watch_flag=True, data_frame=True)
-        ev = watch_one.get_pbs_env(watch_flag=True, data_frame=True)
-        tm = watch_one.get_time(watch_flag=True, data_frame=True)
-        rs = watch_one.get_resources(watch_flag=True, data_frame=True)
-        self.update_csv(file=self.metadata_filename, data=md)
-        self.update_csv(file=self.vl_metadata_filename, data=ev)
-        self.update_csv(file=self.time_metadata_filename, data=tm)
-        self.update_csv(file=self.resource_metadata_filename, data=rs)
-
-        if job_dict[job_id]['job_state'] == 'Q':
-            yield 'Waiting for %s to start running.' % job_id
-            sleep(sleeper)
-            self.watch(job_id, sleeper=sleeper)
-        elif job_dict[job_id]['job_state'] == 'R':
-            yield 'Waiting for %s to finish running.' % job_id
-            sleep(sleeper)
-            self.watch(job_id, sleeper=sleeper)
