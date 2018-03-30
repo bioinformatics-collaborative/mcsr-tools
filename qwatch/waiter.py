@@ -20,8 +20,7 @@ with open(yfile, 'r') as yf:
 
 async def _async_watch(job_id, directory, sleeper=120, **kwargs):
     """Wait until a job or list of jobs finishes and get updates."""
-    if job_id != directory.stem:
-        directory = directory / Path(job_id)
+
     watch_one = qwatch.Qwaiter(jobs=[job_id], directory=directory, **kwargs)
     job_dict = watch_one.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
 
@@ -54,11 +53,8 @@ async def _async_watch_jobs(jobs, sleeper, **kwargs):
     print(f'async_jobs:{jobs}')
     print(f'async_kwargs:{kwargs}')
     dir = Path(os.getcwd()) / Path('qwait_test')
-    tasks = [await _async_watch(job_id=job, directory=dir, sleeper=sleeper, **kwargs) for job in jobs]
-    result = await asyncio.gather(tasks)
-    for r in result:
-        print(r)
-
+    tasks = [_async_watch(job_id=job, directory= dir / Path(job), sleeper=sleeper, **kwargs) for job in jobs]
+    return await asyncio.gather(*tasks)
 
 ioloop = asyncio.get_event_loop()
 ioloop.run_until_complete(_async_watch_jobs(jobs=_kwargs["jobs"], sleeper=_kwargs["sleeper"], **_kwargs["kwargs"]))
