@@ -173,7 +173,8 @@ class Qwatch(object):
                         if item != "\n":
                             qstat_phrase = item
                         else:
-                            print("New Job or end of file!")
+                            pass
+                            #print("New Job or end of file!")
                     # If there is no keyword and tabbed whitespace is recognized, then the current line
                     # is a continuation phrase for the most recent qstat keyword
                     elif "\t" in item:
@@ -395,7 +396,7 @@ class Qwaiter(Qwatch):
                                                                     "metadata_filename", "plot_filename", "qstat_filename",
                                                                     "resource_metadata_filename", "time_metadata_filename",
                                                                     "vl_metadata_filename", "yaml_filename"])
-        kw_dict["sleeper"] = 120
+        kw_dict["sleeper"] = 20
         with open('temp_yaml.yml', 'w') as ty:
             yaml.dump(kw_dict, stream=ty, default_flow_style=False)
 
