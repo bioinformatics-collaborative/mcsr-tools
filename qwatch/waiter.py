@@ -21,14 +21,14 @@ with open(yfile, 'r') as yf:
 async def _async_watch(job_id, directory, sleeper=120, **kwargs):
     """Wait until a job or list of jobs finishes and get updates."""
 
-    watch_one = qwatch.Qwaiter(jobs=[job_id], directory=directory, **kwargs)
-    job_dict = watch_one.full_workflow(watch=True, parse=True, process=True, data=True, metadata=False)
+    watch_one = qwatch.Qwaiter(jobs=[job_id], directory=directory,  watch=True, **kwargs)
+    job_dict = watch_one.full_workflow(parse=True, process=True, data=True, metadata=False)
 
     if job_dict:
-        md = watch_one.get_metadata(watch_flag=True, data_frame=True)
-        ev = watch_one.get_pbs_env(watch_flag=True, data_frame=True)
-        tm = watch_one.get_time(watch_flag=True, data_frame=True)
-        rs = watch_one.get_resources(watch_flag=True, data_frame=True)
+        md = watch_one.get_metadata(data_frame=True)
+        ev = watch_one.get_pbs_env(data_frame=True)
+        tm = watch_one.get_time(data_frame=True)
+        rs = watch_one.get_resources(data_frame=True)
         watch_one.update_csv(file=watch_one.metadata_filename, data=md)
         watch_one.update_csv(file=watch_one.vl_metadata_filename, data=ev)
         watch_one.update_csv(file=watch_one.time_metadata_filename, data=tm)
