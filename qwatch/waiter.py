@@ -47,15 +47,15 @@ async def _async_watch(job_id, directory, sleeper=120, **kwargs):
     return f'Finished {job_id}'
 
 
-async def _async_watch_jobs(jobs, sleeper, **kwargs):
+async def _async_watch_jobs(jobs, sleeper, home_dir, **kwargs):
 
     # with tempfile.TemporaryDirectory() as tempdir:
     print(f'async_jobs:{jobs}')
     print(f'async_kwargs:{kwargs}')
-    dir = Path(os.getcwd()) / Path('qwait_test')
-    tasks = [_async_watch(job_id=job, directory= dir / Path(job), sleeper=sleeper, **kwargs) for job in jobs]
+    tasks = [_async_watch(job_id=job, directory=home_dir/Path(job), sleeper=sleeper, **kwargs) for job in jobs]
     return await asyncio.gather(*tasks)
 
 ioloop = asyncio.get_event_loop()
-ioloop.run_until_complete(_async_watch_jobs(jobs=_kwargs["jobs"], sleeper=_kwargs["sleeper"], **_kwargs["kwargs"]))
+ioloop.run_until_complete(_async_watch_jobs(jobs=_kwargs["jobs"], sleeper=_kwargs["sleeper"],
+                                            home_dir=_kwargs["directory"], **_kwargs["kwargs"]))
 ioloop.close()

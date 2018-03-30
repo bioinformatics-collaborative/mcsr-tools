@@ -410,6 +410,7 @@ class Qwaiter(Qwatch):
                                                                     "resource_metadata_filename", "time_metadata_filename",
                                                                     "vl_metadata_filename", "yaml_filename"])
         kw_dict["sleeper"] = 120
+        kw_dict["directory"] = self.directory
         with open('temp_yaml.yml', 'w') as ty:
             yaml.dump(kw_dict, stream=ty, default_flow_style=False)
 
