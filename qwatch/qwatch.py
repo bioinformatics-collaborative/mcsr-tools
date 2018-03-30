@@ -380,8 +380,21 @@ class Qwaiter(Qwatch):
         return _kwargs
 
     def update_csv(self, file, data):
+        with open(self._yaml_config, 'r') as yc:
+            _checker_dict = yaml.load(yc)
+            _checker_list = []
+            _checker_list.append('Job Id')
+            _checker_list = _checker_list + list(_checker_dict['Job Id'].keys())
+            _checker_list = _checker_list + list(_checker_dict['Job Id']['Variable_List'].keys())
+        _data_index_list = list(data.index)
+        diff = list(set(_data_index_list) - set(_checker_list))
+        if len(diff) != 0:
+            with open('checker_log.log', 'a') as cl:
+                cl.write('There are unresolved qstat keywords: %s\nAdd them to the qstat_dict.yml file\n\n' % diff)
         if file.is_file():
-            file_df = pd.read_csv(file)
+            file_df = pd.read_csv(file, index_col=0)
+            print(f'fdf{file_df}')
+            print(f'd{data}')
             updated_df = pd.concat([file_df, data], axis=1)
             updated_df.to_csv(file)
         else:
@@ -396,7 +409,7 @@ class Qwaiter(Qwatch):
                                                                     "metadata_filename", "plot_filename", "qstat_filename",
                                                                     "resource_metadata_filename", "time_metadata_filename",
                                                                     "vl_metadata_filename", "yaml_filename"])
-        kw_dict["sleeper"] = 20
+        kw_dict["sleeper"] = 120
         with open('temp_yaml.yml', 'w') as ty:
             yaml.dump(kw_dict, stream=ty, default_flow_style=False)
 
