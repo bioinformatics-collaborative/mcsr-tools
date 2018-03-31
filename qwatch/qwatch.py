@@ -95,7 +95,7 @@ class Qwatch(object):
         self.yaml_filename = Path(self.directory) / Path(f"{filename_pattern}.yml")
         self.metadata_filename = Path(self.directory) / Path(f"{filename_pattern}.csv")
         self.pbs_env_filename = Path(self.directory) / Path(f"{filename_pattern}_pbs_env.csv")
-        self.plot_filename = Path(self.directory) / Path(f"{filename_pattern}_plot.csv")
+        self.plot_md_filename = Path(self.directory) / Path(f"{filename_pattern}_plot.csv")
         self.plot_filename = Path(self.directory) / Path(f"{filename_pattern}_plot.png")
 
     def parse_qstat_data(self):
@@ -265,7 +265,7 @@ class Qwatch(object):
         master_dict["Variable_List"] = vl_dict
         master_dict["Metadata"] = md_dict
         master_dict["Plot"] = plot_dict
-
+        print(master_dict["Plot"])
         return master_dict
 
     def get_dataframes(self):

@@ -29,16 +29,16 @@ async def _async_watch(job_id, directory, sleeper=120, **kwargs):
         ev = watch_one.get_pbs_env(data_frame=True)
         pl = watch_one.get_plot_data(data_frame=True)
         watch_one.update_csv(file=watch_one.metadata_filename, data=md)
-        watch_one.update_csv(file=watch_one.vl_metadata_filename, data=ev)
-        watch_one.update_csv(file=watch_one.plot_metadata_filename, data=pl)
+        watch_one.update_csv(file=watch_one.pbs_env_filename, data=ev)
+        watch_one.update_csv(file=watch_one.plot_md_filename, data=pl)
         print(f"Updated qstat data for {job_id}")
 
         if job_dict[job_id]['job_state'] == 'Q':
             sleep(sleeper)
-            await _async_watch(job_id, directory, sleeper, **kwargs)
+            _async_watch(job_id, directory, sleeper, **kwargs)
         elif job_dict[job_id]['job_state'] == 'R':
             sleep(sleeper)
-            await _async_watch(job_id, directory, sleeper, **kwargs)
+            _async_watch(job_id, directory, sleeper, **kwargs)
 
     return f'Finished {job_id}'
 
