@@ -44,9 +44,8 @@ class Qwatch(object):
         self.qstat_filename = Path()
         self.yaml_filename = Path()
         self.metadata_filename = Path()
-        self.vl_metadata_filename = Path()
-        self.resource_metadata_filename = Path()
-        self.time_metadata_filename = Path()
+        self.pbs_env_filename = Path()
+        self.plot_md_filename = Path()
         self.plot_filename = Path()
         self._yaml_config = "qstat_dict.yml"
         self.initialize_data_files()
@@ -88,14 +87,14 @@ class Qwatch(object):
                 filename_pattern = f"{current_user}_{_id}"
             self.filename_pattern = filename_pattern
         filename_pattern = self.filename_pattern
+
         # Create file names using the pattern
         Path(self.directory).mkdir(parents=True, exist_ok=True)
         self.yaml_filename = Path(self.directory) / Path(f"{filename_pattern}.yml")
-        self.metadata_filename = Path(self.directory) / Path(f"{filename_pattern}_metadata.csv")
-        self.vl_metadata_filename = Path(self.directory) / Path(f"{filename_pattern}_vl_metadata.csv")
-        self.resource_metadata_filename = Path(self.directory) / Path(f"{filename_pattern}_resource_metadata.csv")
-        self.time_metadata_filename = Path(self.directory) / Path(f"{filename_pattern}_time_metadata.csv")
-        self.plot_filename = Path(self.directory) / Path(f"{filename_pattern}.png")
+        self.metadata_filename = Path(self.directory) / Path(f"{filename_pattern}.csv")
+        self.pbs_env_filename = Path(self.directory) / Path(f"{filename_pattern}_pbs_env.csv")
+        self.plot_filename = Path(self.directory) / Path(f"{filename_pattern}_plot.csv")
+        self.plot_filename = Path(self.directory) / Path(f"{filename_pattern}_plot.png")
 
     def parse_qstat_data(self):
         if self.infile:
@@ -237,8 +236,7 @@ class Qwatch(object):
         master_dict = OrderedDict()
         vl_dict = OrderedDict()
         md_dict = OrderedDict()
-        res_dict = OrderedDict()
-        time_dict = OrderedDict()
+        plot_dict = OrderedDict()
         for job in jobs_dict.keys():
             row = OrderedDict()
             _job = OrderedDict()
@@ -254,20 +252,17 @@ class Qwatch(object):
         for job in df.keys():
             vl_dict[job] = df[job]['Variable_List']
             md_dict[job] = OrderedDict()
-            res_dict[job] = OrderedDict()
-            time_dict[job] = OrderedDict()
+            plot_dict[job] = OrderedDict()
             for keyword in df[job].keys():
-                if "resource" in keyword.lower():
-                    res_dict[job][keyword] = df[job][keyword]
-                elif "time" in keyword.lower():
-                    time_dict[job][keyword] = df[job][keyword]
+                if "resource" in keyword.lower() or "time" in keyword.lower():
+                    plot_dict[job][keyword] = df[job][keyword]
                 elif keyword != 'Variable_List':
                     md_dict[job][keyword] = df[job][keyword]
 
         master_dict["Variable_List"] = vl_dict
         master_dict["Metadata"] = md_dict
-        master_dict["Resources"] = res_dict
-        master_dict["Time"] = time_dict
+        master_dict["Plot"] = plot_dict
+
         return master_dict
 
     def get_dataframes(self):
@@ -296,7 +291,7 @@ class Qwatch(object):
             _data = self.get_dicts()
         return _data["Variable_List"]
 
-    def get_resources(self, data_frame=False):
+    def get_plot_data(self, data_frame=False):
         if data_frame:
             _data = self.get_dataframes()
         else:
