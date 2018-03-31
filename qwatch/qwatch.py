@@ -48,6 +48,8 @@ class Qwatch(object):
         self.plot_md_filename = Path()
         self.plot_filename = Path()
         self._yaml_config = "qstat_dict.yml"
+
+        # Other initial configuration
         self.initialize_data_files()
         self._setup_yaml()
 
@@ -72,7 +74,7 @@ class Qwatch(object):
                 self.process_jobs()
 
     def initialize_data_files(self):
-
+        # Get a filename pattern based on other user input
         if not self.filename_pattern:
             print("not_fnp")
             if self.infile:
@@ -113,15 +115,17 @@ class Qwatch(object):
     def process_jobs(self):
         # Parse the qstat file and create a dictionary object
         job_dict = self.qstat_parser()
-        #print(job_dict)
+
         # Filter and keep only the selected jobs and then create a YAML file
         kept_jobs, kept_dict = self.filter_jobs(job_dict)
         print(f'jobs: {kept_jobs}')
-        #print(f'dict: {kept_dict}')
+
+        # if the yaml file doesnt exist then update the jobs and dump the qstat data
         if not self.yaml_filename.is_file() or self.watch is True:
             self.jobs = kept_jobs
             with open(self.yaml_filename, 'w') as yf:
                 yaml.dump(kept_dict, stream=yf, default_flow_style=False)
+        # If the yaml file is empty, then overwrite it.
         else:
             with open(self.yaml_filename, 'r') as yf:
                 test = yaml.load(yf)
@@ -231,7 +235,6 @@ class Qwatch(object):
 
     def get_dicts(self):
         jobs_dict = self.get_qstat_data()
-        print(jobs_dict)
         df = OrderedDict()
         master_dict = OrderedDict()
         vl_dict = OrderedDict()
@@ -271,10 +274,6 @@ class Qwatch(object):
         for key in master_dict.keys():
             master_df[key] = pd.DataFrame.from_dict(master_dict[key])
 
-        #pprint(vl_df)
-        #pprint(md_df)
-        #print(pd.DataFrame.from_dict(vl_df))
-        #print(pd.DataFrame.from_dict(md_df))
         return master_df
 
     def get_metadata(self, data_frame=False):
@@ -296,48 +295,7 @@ class Qwatch(object):
             _data = self.get_dataframes()
         else:
             _data = self.get_dicts()
-        return _data["Resources"]
-
-    def get_time(self, data_frame=False):
-        if data_frame:
-            _data = self.get_dataframes()
-        else:
-            _data = self.get_dicts()
-        return _data["Time"]
-
-        # master_df = self.get_dicts(watch_flag=watch_flag)
-        # allocated_resources = ["Resource_List.mem", "Resource_List.mpiprocs", "Resource_List.nodect", "Resource_List.nodes", "Resource_List.place", "Resource_List.select", "Resource_List.walltime"]
-        # used_resources = ["resources_used.cpupercent", "resources_used.cput", "resources_used.mem", "resources_used.ncpus", "resources_used.vmem", "resources_used.walltime"]
-        # time_dict = {"creation": "ctime",
-        #              "queued": "qtime",
-        #              "eligible_to_run": "etime",
-        #              "started_running": "stime",
-        #              "modification": "mtime"}
-        #
-        # match = re.match(r"([a-z]+)([0-9]+)", 'foofo21', re.I)
-        # if match:
-        #     item = match.groups()
-
-        # Resource_List.mem = 16777216kb
-        # Resource_List.mpiprocs = 16
-        # Resource_List.ncpus = 16
-        # Resource_List.nodect = 1
-        # Resource_List.nodes = 1:ppn=16
-        # Resource_List.place = scatter
-        # Resource_List.select = 1:ncpus=16:mem=16777216KB:mpiprocs=16
-        # Resource_List.walltime = 9999:00:00
-
-        # resources_used.cpupercent = 829
-        # resources_used.cput = 01:50:15
-        # resources_used.mem = 2828700kb
-        # resources_used.ncpus = 16
-        # resources_used.vmem = 56230484kb
-        # resources_used.walltime = 00:13:25
-
-        # ctime: Time job was created -- unlike what I reported initially, this attribute exists. Not sure whether ctime or qtime are what saga needs to know
-        # etime: Time job became eligible to run -- NOT the end time!
-        # qtime: Time job was queued
-        # stime: Time job started to run
+        return _data["Plot"]
 
     def filter_jobs(self, job_dict):
         kept_jobs = []
