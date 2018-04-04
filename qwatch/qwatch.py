@@ -130,8 +130,8 @@ class Qwatch(object):
             with open(self.yaml_filename, 'r') as yf:
                 test = yaml.load(yf)
                 if not test:
-                    with open(self.yaml_filename, 'w') as yf:
-                        yaml.dump(kept_dict, stream=yf, default_flow_style=False)
+                    with open(self.yaml_filename, 'w') as yf2:
+                        yaml.dump(kept_dict, stream=yf2, default_flow_style=False)
 
     def qstat_parser(self):
         """
@@ -229,8 +229,8 @@ class Qwatch(object):
                 test = yaml.load(yf)
                 if not test:
                     self.process_jobs()
-                    with open(self.yaml_filename, 'w') as yf:
-                        jobs_dict = yaml.load(yf)
+                    with open(self.yaml_filename, 'w') as yf2:
+                        jobs_dict = yaml.load(yf2)
         return jobs_dict
 
     def get_dicts(self):
@@ -300,6 +300,8 @@ class Qwatch(object):
     def filter_jobs(self, job_dict):
         kept_jobs = []
         print(len(self.users))
+        print(len(self.jobs))
+        print(self.jobs)
         if len(self.jobs) != 0 or len(self.users) != 0:
             print('if')
             for j in job_dict.keys():
@@ -308,7 +310,7 @@ class Qwatch(object):
                         print(j)
                         kept_jobs.append(j)
                 elif len(self.jobs) > 0:
-                    if job_dict[j]["Job_Name"] in self.jobs:
+                    if job_dict[j]["Job_Id"] in self.jobs:
                         kept_jobs.append(j)
                         print(j)
         else:
