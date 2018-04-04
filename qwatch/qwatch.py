@@ -8,8 +8,10 @@ import tempfile
 from pathlib import Path
 import pandas as pd
 from collections import OrderedDict
+from dateutil import parser
 import random
 from time import sleep
+from datetime import datetime
 import asyncio
 import plotly.plotly as py
 import plotly.graph_objs as go
@@ -233,7 +235,10 @@ class Qwatch(object):
                         jobs_dict = yaml.load(yf2)
         return jobs_dict
 
-    def get_dicts(self):
+    def get_dicts(self, python_datetime=None):
+        if python_datetime:
+            python_time = datetime.time(python_datetime)
+            python_date = datetime.date(python_datetime)
         jobs_dict = self.get_qstat_data()
         df = OrderedDict()
         master_dict = OrderedDict()
@@ -256,9 +261,24 @@ class Qwatch(object):
             vl_dict[job] = df[job]['Variable_List']
             md_dict[job] = OrderedDict()
             plot_dict[job] = OrderedDict()
+            if python_datetime:
+                vl_dict[job]["py_time"] = python_time
+                vl_dict[job]["py_date"] = python_date
+                md_dict[job]["py_time"] = python_time
+                md_dict[job]["py_date"] = python_date
+                plot_dict[job]["py_time"] = python_time
+                plot_dict[job]["py_date"] = python_date
+
             for keyword in df[job].keys():
                 if "resource" in keyword.lower() or "time" in keyword.lower():
-                    plot_dict[job][keyword] = df[job][keyword]
+                    if "time" in keyword.lower():
+                        if(len(keyword)) == 5:
+                            plot_dict[job][f'{keyword}_time'] = str(parser.parse(df[job][keyword]).time())
+                            plot_dict[job][f'{keyword}_date'] = str(parser.parse(df[job][keyword]).date())
+                        else:
+                            plot_dict[job][keyword] = df[job][keyword]
+                    else:
+                        plot_dict[job][keyword] = df[job][keyword]
                 elif keyword != 'Variable_List':
                     md_dict[job][keyword] = df[job][keyword]
 
@@ -268,33 +288,33 @@ class Qwatch(object):
         print(master_dict["Plot"])
         return master_dict
 
-    def get_dataframes(self):
-        master_dict = self.get_dicts()
+    def get_dataframes(self, python_datetime=None):
+        master_dict = self.get_dicts(python_datetime=python_datetime)
         master_df = OrderedDict()
         for key in master_dict.keys():
             master_df[key] = pd.DataFrame.from_dict(master_dict[key])
 
         return master_df
 
-    def get_metadata(self, data_frame=False):
+    def get_metadata(self, data_frame=False, python_datetime=None):
         if data_frame:
-            _data = self.get_dataframes()
+            _data = self.get_dataframes(python_datetime=python_datetime)
         else:
-            _data = self.get_dicts()
+            _data = self.get_dicts(python_datetime=python_datetime)
         return _data["Metadata"]
 
-    def get_pbs_env(self, data_frame=False):
+    def get_pbs_env(self, data_frame=False, python_datetime=None):
         if data_frame:
-            _data = self.get_dataframes()
+            _data = self.get_dataframes(python_datetime=python_datetime)
         else:
-            _data = self.get_dicts()
+            _data = self.get_dicts(python_datetime=python_datetime)
         return _data["Variable_List"]
 
-    def get_plot_data(self, data_frame=False):
+    def get_plot_data(self, data_frame=False, python_datetime=None):
         if data_frame:
-            _data = self.get_dataframes()
+            _data = self.get_dataframes(python_datetime=python_datetime)
         else:
-            _data = self.get_dicts()
+            _data = self.get_dicts(python_datetime=python_datetime)
         return _data["Plot"]
 
     def filter_jobs(self, job_dict):
