@@ -231,8 +231,8 @@ class Qwatch(object):
                 test = yaml.load(yf)
                 if not test:
                     self.process_jobs()
-                    with open(self.yaml_filename, 'w') as yf2:
-                        jobs_dict = yaml.load(yf2)
+        with open(self.yaml_filename, 'r') as yf2:
+            jobs_dict = yaml.load(yf2)
         return jobs_dict
 
     def get_dicts(self, python_datetime=None):
