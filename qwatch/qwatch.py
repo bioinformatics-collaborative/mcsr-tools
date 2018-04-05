@@ -258,29 +258,34 @@ class Qwatch(object):
             df.update(_job)
         # Rework this
         for job in df.keys():
-            vl_dict[job] = df[job]['Variable_List']
+            var_dict = OrderedDict()
+            for var in df[job]['Variable_List'].keys():
+                var_dict[var] = [df[job]['Variable_List'][var]]
+            vl_dict[job] = var_dict
             md_dict[job] = OrderedDict()
             plot_dict[job] = OrderedDict()
             if python_datetime:
-                vl_dict[job]["py_time"] = python_time
-                vl_dict[job]["py_date"] = python_date
-                md_dict[job]["py_time"] = python_time
-                md_dict[job]["py_date"] = python_date
-                plot_dict[job]["py_time"] = python_time
-                plot_dict[job]["py_date"] = python_date
+                vl_dict[job]["datetime"] = [python_datetime]
+                md_dict[job]["datetime"] = [python_datetime]
+                plot_dict[job]["datetime"] = [python_datetime]
+                # vl_dict[job]["py_time"] = [python_time]
+                # vl_dict[job]["py_date"] = [python_date]
+                # md_dict[job]["py_time"] = [python_time]
+                # md_dict[job]["py_date"] = [python_date]
+                # plot_dict[job]["py_time"] = [python_time]
+                # plot_dict[job]["py_date"] = [python_date]
 
             for keyword in df[job].keys():
                 if "resource" in keyword.lower() or "time" in keyword.lower():
                     if "time" in keyword.lower():
                         if(len(keyword)) == 5:
-                            plot_dict[job][f'{keyword}_time'] = str(parser.parse(df[job][keyword]).time())
-                            plot_dict[job][f'{keyword}_date'] = str(parser.parse(df[job][keyword]).date())
+                            plot_dict[job][keyword] = [str(parser.parse(df[job][keyword]))]
                         else:
-                            plot_dict[job][keyword] = df[job][keyword]
+                            plot_dict[job][keyword] = [df[job][keyword]]
                     else:
-                        plot_dict[job][keyword] = df[job][keyword]
+                        plot_dict[job][keyword] = [df[job][keyword]]
                 elif keyword != 'Variable_List':
-                    md_dict[job][keyword] = df[job][keyword]
+                    md_dict[job][keyword] = [df[job][keyword]]
 
         master_dict["Variable_List"] = vl_dict
         master_dict["Metadata"] = md_dict
@@ -292,7 +297,11 @@ class Qwatch(object):
         master_dict = self.get_dicts(python_datetime=python_datetime)
         master_df = OrderedDict()
         for key in master_dict.keys():
-            master_df[key] = pd.DataFrame.from_dict(master_dict[key])
+            if len(self.jobs) > 1:
+                master_df[key] = pd.DataFrame.from_dict(master_dict[key])
+            else:
+                for job in master_dict[key].keys():
+                    master_df[key] = pd.DataFrame.from_dict(dict(master_dict[key][job]))
 
         return master_df
 
@@ -370,7 +379,7 @@ class Qwaiter(Qwatch):
             file_df = pd.read_csv(file, index_col=0)
             print(f'fdf{file_df}')
             print(f'd{data}')
-            updated_df = pd.concat([file_df, data], axis=1)
+            updated_df = pd.concat([file_df, data])
             updated_df.to_csv(file)
         else:
             data.to_csv(file)
