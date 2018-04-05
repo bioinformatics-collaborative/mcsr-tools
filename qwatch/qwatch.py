@@ -25,17 +25,28 @@ class Qwatch(object):
     A class for parsing "qstat -f" output on SGE systems for monitoring
     jobs and making smart decisions about resource allocation.
     """
-    def __init__(self, jobs: list=None, metadata: list=None, email: str=None, infile: str=None, watch: (bool or None)=None, plot: (bool or None)=None,
-                 filename_pattern: str=None, directory: str='.', users: list = list([os.getlogin()]), cmd: str="qstat -f"):
+    def __init__(self, jobs: (list or str)=None, metadata: list=None, email: str=None, infile: str=None, watch: (bool or None)=None, plot: (bool or None)=None,
+                 filename_pattern: str=None, directory: str='.', users: (list or str) = os.getlogin(), cmd: str="qstat -f"):
         self.cmd = cmd
+        # Get a user list
         if not users:
             self.users = []
-        else:
+        elif isinstance(users, str):
+            self.users = [users]
+        elif isinstance(users, list):
             self.users = users
+        else:
+            raise TypeError("The users parameter is a single user string or a multi-user list.")
+        # Get a job list
         if not jobs:
             self.jobs = []
-        else:
+        elif isinstance(jobs, str):
+            self.jobs = [jobs]
+        elif isinstance(jobs, list):
             self.jobs = jobs
+        else:
+            raise TypeError("The jobs parameter is a single job string or a multi-job list.")
+
         self.metadata = metadata
         self.email = email
         self.infile = infile
