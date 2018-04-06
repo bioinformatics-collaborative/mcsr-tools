@@ -42,7 +42,7 @@ class Qwatch(object):
     jobs and making smart decisions about resource allocation.
     """
     def __init__(self, jobs: (list or str)=None, metadata: list=None, email: str=None, infile: str=None, watch: (bool or None)=None, plot: (bool or None)=None,
-                 filename_pattern: str=None, directory: str='.', users: (list or str) = os.getlogin(), cmd: str="qstat -f"):
+                 filename_pattern: str=None, directory: str='.', users: (list or str) = os.getlogin(), cmd: str="qstat -f", sleeper: int=120):
         self.cmd = cmd
         # Get a user list
         if not users:
@@ -70,11 +70,11 @@ class Qwatch(object):
         self.plot = plot
         self.directory = directory
         self.filename_pattern = filename_pattern
+        self.sleeper = sleeper
         self.qstat_filename = Path()
         self.yaml_filename = Path()
-        self.metadata_filename = Path()
-        self.pbs_env_filename = Path()
-        self.plot_md_filename = Path()
+        self.data_filename = Path()
+        self.info_filename = Path()
         self.plot_filename = Path()
         self._yaml_config = "qstat_dict.yml"
 
@@ -117,15 +117,13 @@ class Qwatch(object):
                 _id = random.randint(10000, 99999)
                 filename_pattern = f"{current_user}_{_id}"
             self.filename_pattern = filename_pattern
-        filename_pattern = self.filename_pattern
 
         # Create file names using the pattern
         Path(self.directory).mkdir(parents=True, exist_ok=True)
-        self.yaml_filename = Path(self.directory) / Path(f"{filename_pattern}.yml")
-        self.metadata_filename = Path(self.directory) / Path(f"{filename_pattern}.csv")
-        self.pbs_env_filename = Path(self.directory) / Path(f"{filename_pattern}_pbs_env.csv")
-        self.plot_md_filename = Path(self.directory) / Path(f"{filename_pattern}_plot.csv")
-        self.plot_filename = Path(self.directory) / Path(f"{filename_pattern}_plot.png")
+        self.yaml_filename = Path(self.directory) / Path(f"{self.filename_pattern}.yml")
+        self.data_filename = Path(self.directory) / Path(f"{self.filename_pattern}.csv")
+        self.info_filename = Path(self.directory) / Path(f"{self.filename_pattern}_info.txt")
+        self.plot_filename = Path(self.directory) / Path(f"{self.filename_pattern}_plot.png")
 
     def parse_qstat_data(self):
         if self.infile:
@@ -263,61 +261,38 @@ class Qwatch(object):
         return jobs_dict
 
     def get_dicts(self, python_datetime=None):
-        if python_datetime:
-            python_time = datetime.time(python_datetime)
-            python_date = datetime.date(python_datetime)
         jobs_dict = self.get_qstat_data()
         df = OrderedDict()
         master_dict = OrderedDict()
-        vl_dict = OrderedDict()
-        md_dict = OrderedDict()
-        plot_dict = OrderedDict()
+        info_dict = OrderedDict()
+        data_dict = OrderedDict()
         for job in jobs_dict.keys():
             row = OrderedDict()
             _job = OrderedDict()
-            if not self.metadata:
-                row = jobs_dict[job]
-            else:
-                for var in self.metadata:
-                    item = jobs_dict[job][var]
-                    row[var] = item
+            row = jobs_dict[job]
             _job[job] = row
             df.update(_job)
         # Rework this
         for job in df.keys():
             var_dict = OrderedDict()
+            # PBS Environment Variables
             for var in df[job]['Variable_List'].keys():
                 var_dict[var] = [df[job]['Variable_List'][var]]
-            vl_dict[job] = var_dict
-            md_dict[job] = OrderedDict()
-            plot_dict[job] = OrderedDict()
+            info_dict[job] = var_dict
+            data_dict[job] = OrderedDict()
             if python_datetime:
-                vl_dict[job]["datetime"] = [python_datetime]
-                md_dict[job]["datetime"] = [python_datetime]
-                plot_dict[job]["datetime"] = [python_datetime]
-                # vl_dict[job]["py_time"] = [python_time]
-                # vl_dict[job]["py_date"] = [python_date]
-                # md_dict[job]["py_time"] = [python_time]
-                # md_dict[job]["py_date"] = [python_date]
-                # plot_dict[job]["py_time"] = [python_time]
-                # plot_dict[job]["py_date"] = [python_date]
+                info_dict[job]["datetime"] = [python_datetime]
+                data_dict[job]["datetime"] = [python_datetime]
 
             for keyword in df[job].keys():
-                if "resource" in keyword.lower() or "time" in keyword.lower():
-                    if "time" in keyword.lower():
-                        if(len(keyword)) == 5:
-                            plot_dict[job][keyword] = [str(parser.parse(df[job][keyword]))]
-                        else:
-                            plot_dict[job][keyword] = [df[job][keyword]]
-                    else:
-                        plot_dict[job][keyword] = [df[job][keyword]]
-                elif keyword != 'Variable_List':
-                    md_dict[job][keyword] = [df[job][keyword]]
+                if keyword in self.__static_kw:
+                    if keyword != "Variable_List":
+                        info_dict[job][keyword] = [df[job][keyword]]
+                elif keyword in self.__dynamic_kw:
+                    data_dict[job][keyword] = [df[job][keyword]]
 
-        master_dict["Variable_List"] = vl_dict
-        master_dict["Metadata"] = md_dict
-        master_dict["Plot"] = plot_dict
-        print(master_dict["Plot"])
+        master_dict["info"] = info_dict
+        master_dict["data"] = data_dict
         return master_dict
 
     def get_dataframes(self, python_datetime=None):
@@ -332,26 +307,19 @@ class Qwatch(object):
 
         return master_df
 
-    def get_metadata(self, data_frame=False, python_datetime=None):
+    def get_info(self, data_frame=False, python_datetime=None):
         if data_frame:
             _data = self.get_dataframes(python_datetime=python_datetime)
         else:
             _data = self.get_dicts(python_datetime=python_datetime)
-        return _data["Metadata"]
+        return _data["info"]
 
-    def get_pbs_env(self, data_frame=False, python_datetime=None):
+    def get_data(self, data_frame=False, python_datetime=None):
         if data_frame:
             _data = self.get_dataframes(python_datetime=python_datetime)
         else:
             _data = self.get_dicts(python_datetime=python_datetime)
-        return _data["Variable_List"]
-
-    def get_plot_data(self, data_frame=False, python_datetime=None):
-        if data_frame:
-            _data = self.get_dataframes(python_datetime=python_datetime)
-        else:
-            _data = self.get_dicts(python_datetime=python_datetime)
-        return _data["Plot"]
+        return _data["data"]
 
     def filter_jobs(self, job_dict):
         kept_jobs = []
@@ -403,35 +371,63 @@ class Qwaiter(Qwatch):
             with open('checker_log.log', 'a') as cl:
                 cl.write('There are unresolved qstat keywords: %s\nAdd them to the qstat_dict.yml file\n\n' % diff)
         if file.is_file():
-            file_df = pd.read_csv(file, index_col=0)
+            file_df = pd.read_csv(file, index_col=False)
             print(f'fdf{file_df}')
             print(f'd{data}')
             updated_df = pd.concat([file_df, data])
-            updated_df.to_csv(file)
+            updated_df.to_csv(file, index=False, index_label=False)
         else:
-            data.to_csv(file)
+            data.to_csv(file, index=False, index_label=False)
 
     def watch_jobs(self):
         self.parse_qstat_data()
         self.process_jobs()
-        kw_dict = {}
-        kw_dict["jobs"] = self.jobs
-        kw_dict["kwargs"] = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory", "qwatch", "watch", "_yaml_config",
-                                                                    "metadata_filename", "plot_filename", "qstat_filename",
-                                                                    "plot_md_filename", "time_metadata_filename",
-                                                                    "pbs_env_filename", "yaml_filename"])
-        kw_dict["sleeper"] = 120
-        kw_dict["directory"] = self.directory
-        with open('temp_yaml.yml', 'w') as ty:
-            yaml.dump(kw_dict, stream=ty, default_flow_style=False)
+        if len(self.jobs) > 1:
+            kw_dict = {}
+            kw_dict["jobs"] = self.jobs
+            kw_dict["kwargs"] = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory", "qwatch", "watch", "_yaml_config",
+                                                                        "info_filename", "plot_filename", "qstat_filename",
+                                                                        "data_filename", "yaml_filename", "users"])
+            kw_dict["sleeper"] = 5
+            kw_dict["directory"] = self.directory
+            with open('temp_yaml.yml', 'w') as ty:
+                yaml.dump(kw_dict, stream=ty, default_flow_style=False)
 
-        qstat = subprocess.Popen('python3.6 waiter.py -yamlfile temp_yaml.yml', stderr=subprocess.PIPE,
-                                 stdout=subprocess.PIPE, shell=True,
-                                 encoding='utf-8', universal_newlines=False)
-        out = qstat.stdout.read()
-        error = qstat.stderr.read()
-        print(f'out: {out}')
-        print(f'error: {error}')
+            qstat = subprocess.Popen('python3.6 waiter.py -yamlfile temp_yaml.yml', stderr=subprocess.PIPE,
+                                     stdout=subprocess.PIPE, shell=True,
+                                     encoding='utf-8', universal_newlines=False)
+            out = qstat.stdout.read()
+            error = qstat.stderr.read()
+            print(f'out: {out}')
+            print(f'error: {error}')
+        elif len(self.jobs) == 1:
+            self._watch(datetime.now())
+
+    def _watch(self, python_datetime=None, first_time=True):
+        """Wait until a job finishes and get updates."""
+
+        job_dict = self.full_workflow(parse=True, process=True, data=True, metadata=False)
+
+        if job_dict:
+            data = self.get_data(data_frame=True, python_datetime=python_datetime)
+            self.update_csv(file=self.data_filename, data=data)
+            print(f"Updated qstat data for {job_id}")
+
+            if job_dict[self.jobs[0]]['job_state'] == 'Q':
+                sleep(self.sleeper)
+                self._watch(datetime.now(), first_time=True)
+            elif job_dict[self.jobs[0]]['job_state'] == 'R':
+                # Create the static data file on the first instance of a running job
+                if first_time:
+                    info = self.get_info(data_frame=True, python_datetime=python_datetime)
+                    self.update_csv(file=self.info_filename, data=info)
+                sleep(self.sleeper)
+                self._watch(datetime.now(), first_time=False)
+
+        return f'Finished {self.jobs[0]}'
 
     def plot_memory(self):
-        pass
+        for job in self.jobs:
+            _watch = Qwatch(directory=job, jobs=[job])
+            _watch.data_filename
+
