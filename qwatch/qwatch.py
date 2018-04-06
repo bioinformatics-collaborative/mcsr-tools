@@ -1,26 +1,42 @@
 import os
-from pathlib import Path
 import click
 import subprocess
 import yaml
-import random
-import tempfile
 from pathlib import Path
 import pandas as pd
 from collections import OrderedDict
 from dateutil import parser
 import random
-from time import sleep
 from datetime import datetime
-import asyncio
-import plotly.plotly as py
-import plotly.graph_objs as go
+from time import sleep
 from pprint import pprint
-import getpass
-import re
 
 
 class Qwatch(object):
+    # Static qstat Keywords
+    __misc_kw = ["Checkpoint", "Error_Path", "exec_host", "exec_vnode", "Hold_Types", "Join_Path",
+                             "Keep_Files", "Mail_Points", "Output_Path", "Rerunable", "Resource_List.mpiprocs",
+                             "Resource_List.ncpus", "Resource_List.nodect", "Resource_List.nodes",
+                             "Resource_List.place", "Resource_List.select", "jobdir", "Variable_List", "umask",
+                             "project", "Submit_arguments"]
+    __job_limits_kw = ["ctime", "etime", "qtime", "stime", "mtime", "Resource_List.walltime", "Resource_List.cput",
+                           "Resource_List.mem", "stime", "etime"]
+    __job_info_kw = ["Job_Id", "Job_Name", "Job_Owner", "queue", "server", "session_id"]
+    __static_kw = __job_info_kw + __job_limits_kw + __misc_kw
+    # Dynamic qstat Keywords
+    __misc_data_kw = ["job_state", "Priority", "substate", "comment", "run_count"]
+    __job_data_kw = ["resources_used.cpupercent", "resources_used.cput", "resources_used.mem",
+                            "resources_used.vmem", "resources_used.walltime", "resources_used.ncpus"]
+    __dynamic_kw = __job_data_kw + __misc_data_kw
+    # All Keywords
+    __keywords = __static_kw + __dynamic_kw
+    # Metadata options
+    __metadata_dict = {"environment variables": "Variable_List",
+                       "plot": {"limits": __job_limits_kw,
+                                "info": __job_info_kw,
+                                "data": __job_data_kw},
+                       "all": __keywords
+                       }
     """
     A class for parsing "qstat -f" output on SGE systems for monitoring
     jobs and making smart decisions about resource allocation.
