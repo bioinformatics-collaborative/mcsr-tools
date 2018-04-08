@@ -20,7 +20,8 @@ class Qwatch(object):
                              "Resource_List.place", "Resource_List.select", "jobdir", "Variable_List", "umask",
                              "project", "Submit_arguments"]
     __job_limits_kw = ["ctime", "etime", "qtime", "stime", "mtime", "Resource_List.walltime", "Resource_List.cput",
-                           "Resource_List.mem", "stime", "etime"]
+                           "Resource_List.mem"]
+    __job_time_kw = ["ctime", "etime", "qtime", "stime", "mtime"]
     __job_info_kw = ["Job_Id", "Job_Name", "Job_Owner", "queue", "server", "session_id"]
     __static_kw = __job_info_kw + __job_limits_kw + __misc_kw
     # Dynamic qstat Keywords
@@ -287,7 +288,10 @@ class Qwatch(object):
             for keyword in df[job].keys():
                 if keyword in self.__static_kw:
                     if keyword != "Variable_List":
-                        info_dict[job][keyword] = [df[job][keyword]]
+                        if keyword in self.__job_time_kw:
+                            info_dict[job][keyword] = [str(parser.parse(df[job][keyword]))]
+                        else:
+                            info_dict[job][keyword] = [df[job][keyword]]
                 elif keyword in self.__dynamic_kw:
                     data_dict[job][keyword] = [df[job][keyword]]
 
@@ -428,6 +432,8 @@ class Qwaiter(Qwatch):
 
     def plot_memory(self):
         for job in self.jobs:
-            _watch = Qwatch(directory=job, jobs=[job])
-            _watch.data_filename
+            _watch = Qwatch(directory=job, jobs=job)
+            data = pd.read_csv(self.data_filename, index_col=False)
+            info = pd.read_csv(self.info_filename, index_col=False).to_dict("records")[0]
+            "%Y-%m-%d %H:%M:%S"
 
