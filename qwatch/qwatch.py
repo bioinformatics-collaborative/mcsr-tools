@@ -391,7 +391,8 @@ class Qwaiter(Qwatch):
             kw_dict["jobs"] = self.jobs
             kw_dict["kwargs"] = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory", "qwatch", "watch", "_yaml_config",
                                                                         "info_filename", "plot_filename", "qstat_filename",
-                                                                        "data_filename", "yaml_filename", "users"])
+                                                                        "data_filename", "yaml_filename", "users",
+                                                                        "filename_pattern"])
             kw_dict["sleeper"] = 5
             kw_dict["directory"] = self.directory
             with open('temp_yaml.yml', 'w') as ty:
