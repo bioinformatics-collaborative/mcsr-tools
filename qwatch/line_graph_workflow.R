@@ -14,7 +14,7 @@ opt_list <- list(
   make_option(c("-i", "--info")),
   make_option(c("-nql", "--no_qstat_lines"), default = TRUE, action = "store_false"),
   make_option(c("--name"), default = NA, action="store", type="character"),
-  make_option(c("-s", "--save", default=NA, action="store_true"))
+  make_option(c("-rs", "--rdata_save"), default=NA, action="store_true")
 )
 parser <- OptionParser(option_list = opt_list)
 parsed_args <- parse_args(parser)
@@ -50,16 +50,18 @@ p <- ggplot(data2, aes(datetime, Memory, color=Memory_Type)) + geom_line() + sca
     theme(axis.text.x = element_text(angle=60, hjust=1))
 }
 
-rdata_save <- parsed_args$save
+rdata_save <- parsed_args$rdata_save
 new_name <- parsed_args$name
 if(!is.na(new_name)){
   if(!is.na(rdata_save)){
-    save(p, file = sprinf("%s.RData", new_name))
-  }
+    save(p, file = sprintf("%s.RData", new_name))
+  } else{
   ggsave(plot=p,filename = sprintf("%s.png", new_name))
+  }
   } else {
     if(!is.na(rdata_save)){
-      save(p, file = sprinf("%s.RData", df))
-    }
+      save(p, file = sprintf("%s.RData", df))
+    } else {
   ggsave(plot=p,filename = sprintf("%s.png", df))
+  }
   }
