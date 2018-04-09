@@ -40,6 +40,7 @@ async def _async_watch(job_id, directory, python_datetime=None, first_time=True,
                 watch_one.update_csv(file=watch_one.info_filename, data=info)
             await asyncio.sleep(watch_one.sleeper)
             await _async_watch(job_id, directory, datetime.now(), first_time=False, **kwargs)
+    watch_one.plot_memory()
 
     return f'Finished {job_id}'
 
