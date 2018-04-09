@@ -64,6 +64,8 @@ class Qwatch(object):
         else:
             raise TypeError("The jobs parameter is a single job string or a multi-job list.")
 
+        self.orig_jobs = self.jobs
+
         self.metadata = metadata
         self.email = email
         self.infile = infile
@@ -117,7 +119,7 @@ class Qwatch(object):
                 current_user = os.getlogin()
                 _id = random.randint(10000, 99999)
                 filename_pattern = f"{current_user}_{_id}"
-            self.filename_pattern = filename_pattern
+            self.filename_pattern = filename_pattern.replace('.', '_')
 
         # Create file names using the pattern
         Path(self.directory).mkdir(parents=True, exist_ok=True)
@@ -147,10 +149,9 @@ class Qwatch(object):
         # Filter and keep only the selected jobs and then create a YAML file
         kept_jobs, kept_dict = self.filter_jobs(job_dict)
         print(f'jobs: {kept_jobs}')
-
+        self.jobs = kept_jobs
         # if the yaml file doesnt exist then update the jobs and dump the qstat data
         if not self.yaml_filename.is_file() or self.watch is True:
-            self.jobs = kept_jobs
             with open(self.yaml_filename, 'w') as yf:
                 yaml.dump(kept_dict, stream=yf, default_flow_style=False)
         # If the yaml file is empty, then overwrite it.
@@ -407,6 +408,7 @@ class Qwaiter(Qwatch):
             print(f'error: {error}')
         elif len(self.jobs) == 1:
             self._watch(datetime.now())
+            self.plot_memory()
 
     def _watch(self, python_datetime=None, first_time=True):
         """Wait until a job finishes and get updates."""
@@ -431,10 +433,38 @@ class Qwaiter(Qwatch):
 
         return f'Finished {self.jobs[0]}'
 
-    def plot_memory(self):
-        for job in self.jobs:
-            _watch = Qwatch(directory=job, jobs=job)
-            data = pd.read_csv(self.data_filename, index_col=False)
-            info = pd.read_csv(self.info_filename, index_col=False).to_dict("records")[0]
-            "%Y-%m-%d %H:%M:%S"
+    def plot_memory(self, data_file=None, info_file=None, file_pattern=None, directory=None, jobs=None):
+        if jobs:
+            for job in jobs:
+                if directory:
+                    dir_path = Path(directory) / Path(job)
+                else:
+                    dir_path = Path(job)
+                if not data_file:
+                    if not file_pattern:
+                        data_file = dir_path / Path(f'{job}.csv')
+                    else:
+                        data_file = dir_path / Path(f'{file_pattern}.csv')
+                if not info_file:
+                    if not file_pattern:
+                        info_file = dir_path / Path(f'{job}_info.txt')
+                    else:
+                        info_file = dir_path / Path(f'{file_pattern}.txt')
+
+                plot = subprocess.Popen(f'Rscript line_graph_workflow.R -d {str(data_file)} '
+                                        f'-i {str(info_file)} --name {file_pattern}',
+                                        stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True,encoding='utf-8',
+                                        universal_newlines=False)
+                out = plot.stdout.readlines()
+                error = plot.stderr.readlines()
+                print(out)
+                print(error)
+        else:
+            plot = subprocess.Popen(f'Rscript line_graph_workflow.R -d {str(self.data_filename)} '
+                                    f'-i {str(self.info_filename)} --name {self.filename_pattern}', stderr=subprocess.PIPE,
+                                    stdout=subprocess.PIPE, shell=True, encoding='utf-8', universal_newlines=False)
+            out = plot.stdout.readlines()
+            error = plot.stderr.readlines()
+            print(out)
+            print(error)
 
