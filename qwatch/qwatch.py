@@ -393,7 +393,8 @@ class Qwaiter(Qwatch):
             kw_dict["kwargs"] = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory", "qwatch", "watch", "_yaml_config",
                                                                         "info_filename", "plot_filename", "qstat_filename",
                                                                         "data_filename", "yaml_filename", "users",
-                                                                        "filename_pattern"])
+                                                                        "filename_pattern", "orig_jobs"])
+
             kw_dict["sleeper"] = 5
             kw_dict["directory"] = self.directory
             with open('temp_yaml.yml', 'w') as ty:
@@ -408,7 +409,7 @@ class Qwaiter(Qwatch):
             print(f'error: {error}')
         elif len(self.jobs) == 1:
             self._watch(datetime.now())
-            self.plot_memory()
+            #self.plot_memory()
 
     def _watch(self, python_datetime=None, first_time=True):
         """Wait until a job finishes and get updates."""
@@ -433,26 +434,34 @@ class Qwaiter(Qwatch):
 
         return f'Finished {self.jobs[0]}'
 
-    def plot_memory(self, data_file=None, info_file=None, file_pattern=None, directory=None, jobs=None):
+    def plot_memory(self, data_file=None, info_file=None, file_pattern=None, directory=None, jobs=None, rdata_save=False):
         if jobs:
             for job in jobs:
+                print(f'job: {job}')
                 if directory:
                     dir_path = Path(directory) / Path(job)
                 else:
                     dir_path = Path(job)
+                print(f'directory: {dir_path}')
                 if not data_file:
                     if not file_pattern:
-                        data_file = dir_path / Path(f'{job}.csv')
+                        df = dir_path / Path(f'{job}.csv')
                     else:
-                        data_file = dir_path / Path(f'{file_pattern}.csv')
+                        df = dir_path / Path(f'{file_pattern}.csv')
+                print(f'data_file: {df}')
                 if not info_file:
                     if not file_pattern:
-                        info_file = dir_path / Path(f'{job}_info.txt')
+                        inf = dir_path / Path(f'{job}_info.txt')
                     else:
-                        info_file = dir_path / Path(f'{file_pattern}.txt')
-
-                plot = subprocess.Popen(f'Rscript line_graph_workflow.R -d {str(data_file)} '
-                                        f'-i {str(info_file)} --name {file_pattern}',
+                        inf = dir_path / Path(f'{file_pattern}.txt')
+                print(f'info_file: {inf}')
+                cmd = f'Rscript line_graph_workflow.R -d {str(df)} -i {str(inf)}'
+                if rdata_save:
+                    cmd = cmd + ' --rdata_save'
+                if file_pattern:
+                    cmd = cmd + f' --name {file_pattern}'
+                print(f'cmd: {cmd}')
+                plot = subprocess.Popen(cmd,
                                         stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True,encoding='utf-8',
                                         universal_newlines=False)
                 out = plot.stdout.readlines()
