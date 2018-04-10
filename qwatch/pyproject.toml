@@ -1,10 +1,30 @@
 [tool.poetry]
 name = "qwatch"
-version = "0.1.0"
-description = "The qwatch package was developed with pbs_version = 14.1.0 using the Mississippi Center for Computational
-Research (MCSR).  Its primary function is to parse qstat -f data over time.  The data and plots produced allow the user
-to make smarter decision regarding resource allocation for downstream batch jobs."
+version = "0.2.0"
+description = """The qwatch package was developed with pbs_version = 14.1.0 using the Mississippi Center for
+Computational Research (MCSR).  Its primary function is to parse qstat -f data over time.  The data and plots
+produced allow the user to make smarter decision regarding resource allocation for downstream batch jobs."""
 authors = ["Rob Gilmore <rgilmore@umc.edu>"]
+readme = "README.md"
+repository = "https://github.com/bioinformatics-collaborative/mcsr-tools/tree/qwatch_branch/qwatch"
+keywords = ["qsub", "SGE", "PBS", "qstat", "watch"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: System Administrators",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Unix",
+    "Topic :: Scientific/Engineering",
+    "Topic :: System :: Clustering",
+    "Topic :: System :: Distributed Computing",
+    "Topic :: System :: Monitoring"
+    ]
 
 [tool.poetry.dependencies]
 python = "*"
