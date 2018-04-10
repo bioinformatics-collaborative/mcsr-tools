@@ -2,10 +2,13 @@
 name = "qwatch"
 version = "0.1.0"
 description = ""
-authors = ["RAG-home <rgilmore@umc.edu>"]
+authors = ["Rob Gilmore <rgilmore@umc.edu>"]
 
 [tool.poetry.dependencies]
 python = "*"
+click = "^6.7"
+pandas = "^0.22.0"
+pyaml = "^17.12"
 
 [tool.poetry.dev-dependencies]
 pytest = "^3.5"
