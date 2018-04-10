@@ -38,12 +38,38 @@ class BaseQwatch(object):
                                 "data": __job_data_kw},
                        "all": __keywords
                        }
-    """
-    A class for parsing "qstat -f" output on SGE systems for monitoring
-    jobs and making smart decisions about resource allocation.
-    """
+
     def __init__(self, jobs: (list or str)=None, metadata: list=None, email: str=None, infile: str=None, watch: (bool or None)=None, plot: (bool or None)=None,
                  filename_pattern: str=None, directory: str='.', users: (list or str) = os.getlogin(), cmd: str="qstat -f", sleeper: int=120):
+        # TODO-ROB: Remove the metadata and plot parameters
+        # TODO-ROB: Implement emial notifications
+        # TODO-ROB: Implement slack notifications
+        # TODO-ROB: Update variables to something more readable (filename_patter).
+        # TODO-ROB: Create a cleaning function.
+        """
+        A class for parsing "qstat -f" output on SGE systems for monitoring
+        jobs and for making smart downstream decisions about resource allocation.
+        This class uses asyncio in order to monitor multiple jobs at the same time.
+
+        :param jobs:  Jobs to look for.
+        :type jobs: list
+        :param email: Email to send files to
+        :type email: list
+        :param infile: A file that contains 'qstat -f' output
+        :type infile: str
+        :param watch: A flag that indicates that the selected jobs are to be watched
+        :type watch: bool
+        :param filename_pattern: A pattern used to create all of the files.
+        :type filename_pattern: str
+        :param directory: The directory that is used to contain the output files.
+        :type directory: str
+        :param users: Users to look for in the job que.
+        :type users: list
+        :param cmd: The qstat command to use.  This should only be able to change if new parsers are created.
+        :type cmd: str
+        :param sleeper: The minimum length of time in between each data point.
+        :type sleeper: int
+        """
         self.cmd = cmd
         # Get a user list
         if not users:
@@ -66,11 +92,11 @@ class BaseQwatch(object):
 
         self.orig_jobs = self.jobs
 
-        self.metadata = metadata
+        #self.metadata = metadata
         self.email = email
         self.infile = infile
         self.watch = watch
-        self.plot = plot
+        #self.plot = plot
         self.directory = directory
         self.filename_pattern = filename_pattern
         self.sleeper = sleeper
@@ -168,84 +194,81 @@ class BaseQwatch(object):
         'qstat -f' command and parses it.  It uses the qstat keywords found in the
         qstat yaml file.
         :return:  A dictionary of jobs.
-        :rtype:
+        :rtype: dict
         """
         mast_dict = OrderedDict()
         job_count = 0
         phrase_continuation_flag = None
+        with open(self._yaml_config, 'r') as yf:
+            qstat_keywords = yaml.load(yf)
         with open(self.qstat_filename, 'r') as qf:
-            with open(self._yaml_config, 'r') as yf:
-                qstat_keywords = yaml.load(yf)
+            qstat_sentence = None
+            continuation_phrase = ""
+            qstat_phrase = ""
+            prev_item = None
+            for item in qf.readlines():
+                # If a new job is identified then create the nested dictionary
+                if "Job Id" in item:
+                    job_count += 1
+                    _ = item.split(": ")
+                    job_id_key = "%s" % _[1].replace("\r\n", "")
+                    job_id_key = job_id_key.replace("\n", "")
+                    mast_dict[job_id_key] = OrderedDict()
+                    mast_dict[job_id_key]["Job_Id"] = job_id_key
+                # The current line information is used to determine single or multi-lined parsing for the
+                # previous line.
+                # If the a new keyword is recognized, then parse the line.
+                elif "    " in item and any(kw in item for kw in list(qstat_keywords["Job Id"].keys()) + list(qstat_keywords["Job Id"]["Variable_List"].keys())) or item == "\n":
+                    item = item.replace("    ", "")
+                    # Join the multi-lined "phrases" into one "sentence"
+                    if phrase_continuation_flag is True:
+                        qstat_sentence = qstat_phrase + continuation_phrase
+                        phrase_continuation_flag = False
+                    #  If the phrase is a single line
+                    elif qstat_phrase == prev_item:
+                        qstat_sentence = qstat_phrase
+                    # Updates the qstat phrase unless it's in between lines or the end of file
+                    if item != "\n":
+                        qstat_phrase = item
+                    else:
+                        pass
+                # If there is no keyword and tabbed whitespace is recognized, then the current line
+                # is a continuation phrase for the most recent qstat keyword
+                elif "\t" in item:
+                    phrase_continuation_flag = True
+                    continuation_phrase = continuation_phrase + item
+
+                # For multi-line phrases format the qstat sentence
+                if phrase_continuation_flag is False:
+                    qstat_sentence = qstat_sentence.replace("\n\t", "").replace('\n', '')
+                    continuation_phrase = ""
+                    phrase_continuation_flag = None
+                    qstat_list = qstat_sentence.split(" = ")
+                    qstat_keyword = qstat_list[0]
+                    qstat_value = qstat_list[1]
+                    # The variable list is unique in that it can be split into a dictionary of
+                    # environment variables
+                    if qstat_keyword == "Variable_List":
+                        qstat_value = qstat_value.split(",")
+                        temp_dict = OrderedDict(var.split("=") for var in qstat_value)
+                        for vl_key, vl_value in temp_dict.items():
+                            if vl_value[0] == "/" or vl_value[0] == "\\":
+                                vl_value = Path(vl_value)
+                            temp_dict[vl_key] = vl_value
+                        mast_dict[job_id_key]["Variable_List"] = temp_dict
+                    # All of the other qstat keywords/sentences are basic key/value pairs
+                    else:
+                        mast_dict[job_id_key][qstat_keyword] = qstat_value
+
+                # For single line Phrases
+                elif qstat_sentence:
+                    qstat_sentence = qstat_sentence.replace("\n\t", "")
+                    qstat_list = qstat_sentence.split(" = ")
+                    qstat_keyword = qstat_list[0]
+                    qstat_value = qstat_list[1]
+                    mast_dict[job_id_key][qstat_keyword] = qstat_value.replace('\n', '')
                 qstat_sentence = None
-                continuation_phrase = ""
-                qstat_phrase = ""
-                prev_item = None
-                for item in qf.readlines():
-                    # If a new job is identified then create the nested dictionary
-                    if "Job Id" in item:
-                        job_count += 1
-                        _ = item.split(": ")
-                        job_id_key = "%s" % _[1].replace("\r\n", "")
-                        job_id_key = job_id_key.replace("\n", "")
-                        mast_dict[job_id_key] = OrderedDict()
-                        mast_dict[job_id_key]["Job_Id"] = job_id_key
-                    # The current line information is used to determine single or multi-lined parsing for the
-                    # previous line.
-                    # If the a new keyword is recognized, then parse the line.
-                    elif "    " in item and any(kw in item for kw in list(qstat_keywords["Job Id"].keys()) + list(qstat_keywords["Job Id"]["Variable_List"].keys())) or item == "\n":
-                        item = item.replace("    ", "")
-                        # Join the multi-lined "phrases" into one "sentence"
-                        if phrase_continuation_flag is True:
-                            qstat_sentence = qstat_phrase + continuation_phrase
-                            phrase_continuation_flag = False
-                        #  If the phrase is a single line
-                        elif qstat_phrase == prev_item:
-                            qstat_sentence = qstat_phrase
-                        # Updates the qstat phrase unless it's in between lines or the end of file
-                        if item != "\n":
-                            qstat_phrase = item
-                        else:
-                            pass
-                            #print("New Job or end of file!")
-                    # If there is no keyword and tabbed whitespace is recognized, then the current line
-                    # is a continuation phrase for the most recent qstat keyword
-                    elif "\t" in item:
-                        phrase_continuation_flag = True
-                        continuation_phrase = continuation_phrase + item
-
-                    # For multi-line phrases format the qstat sentence
-                    if phrase_continuation_flag is False:
-                        qstat_sentence = qstat_sentence.replace("\n\t", "").replace('\n', '')
-                        #print(f'sentence:  {qstat_sentence}')
-                        continuation_phrase = ""
-                        phrase_continuation_flag = None
-                        qstat_list = qstat_sentence.split(" = ")
-                        qstat_keyword = qstat_list[0]
-                        qstat_value = qstat_list[1]
-                        # The variable list is unique in that it can be split into a dictionary of
-                        # environment variables
-                        if qstat_keyword == "Variable_List":
-                            qstat_value = qstat_value.split(",")
-                            temp_dict = OrderedDict(var.split("=") for var in qstat_value)
-                            for vl_key, vl_value in temp_dict.items():
-                                if vl_value[0] == "/" or vl_value[0] == "\\":
-                                    vl_value = Path(vl_value)
-                                temp_dict[vl_key] = vl_value
-                            mast_dict[job_id_key]["Variable_List"] = temp_dict
-                        # All of the other qstat keywords/sentences are basic key/value pairs
-                        else:
-                            mast_dict[job_id_key][qstat_keyword] = qstat_value
-
-                    # For single line Phrases
-                    elif qstat_sentence:
-                        qstat_sentence = qstat_sentence.replace("\n\t", "")
-                        #print(f'sentence: {qstat_sentence}')
-                        qstat_list = qstat_sentence.split(" = ")
-                        qstat_keyword = qstat_list[0]
-                        qstat_value = qstat_list[1]
-                        mast_dict[job_id_key][qstat_keyword] = qstat_value.replace('\n', '')
-                    qstat_sentence = None
-                    prev_item = item
+                prev_item = item
         return mast_dict
 
     def get_qstat_data(self):
@@ -263,36 +286,49 @@ class BaseQwatch(object):
         return jobs_dict
 
     def get_dicts(self, python_datetime=None):
-        jobs_dict = self.get_qstat_data()
+        """
+        This function takes the filtered yaml file and creates a nested dictionary object that is suitable for
+        creating/updating the info and data csv files.
+
+        :param python_datetime:
+        :type python_datetime:
+        :return:
+        :rtype:
+        """
+        jobs_dict = self.filtered_yaml_to_dict()
         df = OrderedDict()
         master_dict = OrderedDict()
         info_dict = OrderedDict()
         data_dict = OrderedDict()
+        # TODO-ROB: Rework this or rework filterd_yaml_to_dict
         for job in jobs_dict.keys():
             row = OrderedDict()
             _job = OrderedDict()
             row = jobs_dict[job]
             _job[job] = row
             df.update(_job)
-        # Rework this
         for job in df.keys():
             var_dict = OrderedDict()
-            # PBS Environment Variables
+            # Store PBS Environment Variables
             for var in df[job]['Variable_List'].keys():
                 var_dict[var] = [df[job]['Variable_List'][var]]
             info_dict[job] = var_dict
             data_dict[job] = OrderedDict()
+            # Store the python datetime
             if python_datetime:
                 info_dict[job]["datetime"] = [python_datetime]
                 data_dict[job]["datetime"] = [python_datetime]
-
+            # Loop through the keywords
             for keyword in df[job].keys():
+                # Store all of the dynamic data
                 if keyword in self.__static_kw:
                     if keyword != "Variable_List":
+                        # Store the job time values in a datetime format
                         if keyword in self.__job_time_kw:
                             info_dict[job][keyword] = [str(parser.parse(df[job][keyword]))]
                         else:
                             info_dict[job][keyword] = [df[job][keyword]]
+                # Store all of the dynamic data
                 elif keyword in self.__dynamic_kw:
                     data_dict[job][keyword] = [df[job][keyword]]
 
@@ -301,6 +337,14 @@ class BaseQwatch(object):
         return master_dict
 
     def get_dataframes(self, python_datetime=None):
+        """
+        This function returns a dataframe of the current yaml data.  It is specifically used by the update_csv function
+        for creating csv files of the qstat data
+        :param python_datetime:
+        :type python_datetime:
+        :return:
+        :rtype:
+        """
         master_dict = self.get_dicts(python_datetime=python_datetime)
         master_df = OrderedDict()
         for key in master_dict.keys():
@@ -313,6 +357,15 @@ class BaseQwatch(object):
         return master_df
 
     def get_info(self, data_frame=False, python_datetime=None):
+        """
+        Get the data in the info file as a python object (dictionary or dataframe).
+        :param data_frame:
+        :type data_frame:
+        :param python_datetime:
+        :type python_datetime:
+        :return:
+        :rtype:
+        """
         if data_frame:
             _data = self.get_dataframes(python_datetime=python_datetime)
         else:
@@ -320,6 +373,15 @@ class BaseQwatch(object):
         return _data["info"]
 
     def get_data(self, data_frame=False, python_datetime=None):
+        """
+        Get the data in the data file as a python object (dictionary or dataframe).
+        :param data_frame:
+        :type data_frame:
+        :param python_datetime:
+        :type python_datetime:
+        :return:
+        :rtype:
+        """
         if data_frame:
             _data = self.get_dataframes(python_datetime=python_datetime)
         else:
@@ -327,24 +389,27 @@ class BaseQwatch(object):
         return _data["data"]
 
     def filter_jobs(self, job_dict):
+        """
+        Filter a job dict based on the input user or job list.
+        :param job_dict:
+        :type job_dict:
+        :return:
+        :rtype:
+        """
         kept_jobs = []
-        print(len(self.users))
-        print(len(self.jobs))
-        print(self.jobs)
         if len(self.jobs) != 0 or len(self.users) != 0:
-            print('if')
+            # Create a new list of kept jobs
             for j in job_dict.keys():
                 if len(self.users) > 0:
                     if job_dict[j]["Variable_List"]["PBS_O_LOGNAME"] in self.users:
-                        print(j)
                         kept_jobs.append(j)
                 elif len(self.jobs) > 0:
                     if job_dict[j]["Job_Id"] in self.jobs:
                         kept_jobs.append(j)
-                        print(j)
+        # If no user or job is given then use all the jobs
         else:
-            print('else')
             kept_jobs += list(job_dict.keys())
+        # Format the kept job data
         kept_jobs = list(set(kept_jobs))
         kept_dict = OrderedDict((k, job_dict[k]) for k in kept_jobs)
         return kept_jobs, kept_dict
@@ -353,10 +418,25 @@ class BaseQwatch(object):
 class Qwatch(BaseQwatch):
 
     def __init__(self, **kwargs):
+        """
+        This is the top level qwatch class.  It watches jobs, updates csv data files, and plots
+        graphs by calling an R script file.  If multiple jobs are being watched, then asyncio
+        is utilized for efficiency.
+        :param kwargs:
+        :type kwargs:
+        """
         super().__init__(**kwargs)
         self.qwatch = BaseQwatch
 
     def _get_subset_kwargs(self, skipped_kwargs):
+        """
+        Get kwargs that are subset from the original object.  This is used specifically for the async_qwatch.py
+        script.
+        :param skipped_kwargs:
+        :type skipped_kwargs:
+        :return:
+        :rtype:
+        """
         _kwargs = {}
         for var, attr in self.__dict__.items():
             if var not in skipped_kwargs:
@@ -364,6 +444,15 @@ class Qwatch(BaseQwatch):
         return _kwargs
 
     def update_csv(self, file, data):
+        """
+        The update_csv file is named appropriately, but it also checks for undocumented qstat keywords.
+        :param file:
+        :type file:
+        :param data:
+        :type data:
+        :return:
+        :rtype:
+        """
         with open(self._yaml_config, 'r') as yc:
             _checker_dict = yaml.load(yc)
             _checker_list = []
@@ -397,10 +486,11 @@ class Qwatch(BaseQwatch):
 
             kw_dict["sleeper"] = 5
             kw_dict["directory"] = self.directory
+            # Call the asyncio setup for multiple jobs and begin watching
             with open('temp_yaml.yml', 'w') as ty:
                 yaml.dump(kw_dict, stream=ty, default_flow_style=False)
 
-            qstat = subprocess.Popen('python3.6 waiter.py -yamlfile temp_yaml.yml', stderr=subprocess.PIPE,
+            qstat = subprocess.Popen('python3.6 async_qwatch.py -yamlfile temp_yaml.yml', stderr=subprocess.PIPE,
                                      stdout=subprocess.PIPE, shell=True,
                                      encoding='utf-8', universal_newlines=False)
             out = qstat.stdout.read()
@@ -408,8 +498,8 @@ class Qwatch(BaseQwatch):
             print(f'out: {out}')
             print(f'error: {error}')
         elif len(self.jobs) == 1:
+            # Call the single job watcher
             self._watch(datetime.now())
-            #self.plot_memory()
 
     def _watch(self, python_datetime=None, first_time=True):
         """Wait until a job finishes and get updates."""
@@ -435,6 +525,23 @@ class Qwatch(BaseQwatch):
         return f'Finished {self.jobs[0]}'
 
     def plot_memory(self, data_file=None, info_file=None, file_pattern=None, directory=None, jobs=None, rdata_save=False):
+        """
+        Plot a graph of the memory vs time.  Utilizes an R script which creates a ggplot2 line graph.
+        :param data_file:
+        :type data_file:
+        :param info_file:
+        :type info_file:
+        :param file_pattern:
+        :type file_pattern:
+        :param directory:
+        :type directory:
+        :param jobs:
+        :type jobs:
+        :param rdata_save:
+        :type rdata_save:
+        :return:
+        :rtype:
+        """
         if jobs:
             for job in jobs:
                 print(f'job: {job}')
