@@ -22,7 +22,7 @@ with open(yfile, 'r') as yf:
 async def _async_watch(job_id, directory, python_datetime=None, first_time=True, **kwargs):
     """Wait until a list of jobs finishes and get updates."""
 
-    watch_one = qwatch.Qwaiter(jobs=[job_id], directory=directory,  watch=True, users=None, **kwargs)
+    watch_one = qwatch.Qwatch(jobs=[job_id], directory=directory,  watch=True, users=None, **kwargs)
     job_dict = watch_one.full_workflow(parse=True, process=True, data=True, metadata=False)
 
     if job_dict:

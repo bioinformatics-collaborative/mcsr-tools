@@ -12,7 +12,7 @@ from time import sleep
 from pprint import pprint
 
 
-class Qwatch(object):
+class BaseQwatch(object):
     # Static qstat Keywords
     __misc_kw = ["Checkpoint", "Error_Path", "exec_host", "exec_vnode", "Hold_Types", "Join_Path",
                              "Keep_Files", "Mail_Points", "Output_Path", "Rerunable", "Resource_List.mpiprocs",
@@ -350,11 +350,11 @@ class Qwatch(object):
         return kept_jobs, kept_dict
 
 
-class Qwaiter(Qwatch):
+class Qwatch(BaseQwatch):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.qwatch = Qwatch
+        self.qwatch = BaseQwatch
 
     def _get_subset_kwargs(self, skipped_kwargs):
         _kwargs = {}
