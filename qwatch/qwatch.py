@@ -121,15 +121,15 @@ class BaseQwatch(object):
 
     def full_workflow(self, parse, process, data, metadata):
         if parse:
-            self.parse_qstat_data()
+            self.save_qstat_data()
             if metadata or data:
                 if metadata:
                     _data = self.get_dicts()
                 if data:
-                    _data = self.get_qstat_data()
+                    _data = self.filtered_yaml_to_dict()
                 return _data
             elif process:
-                self.process_jobs()
+                self.qstat_to_filtered_yaml()
 
     def initialize_data_files(self):
         # Get a filename pattern based on other user input
@@ -154,7 +154,8 @@ class BaseQwatch(object):
         self.info_filename = Path(self.directory) / Path(f"{self.filename_pattern}_info.txt")
         self.plot_filename = Path(self.directory) / Path(f"{self.filename_pattern}_plot.png")
 
-    def parse_qstat_data(self):
+    def save_qstat_data(self):
+        # Save the 'qstat -f' output to the qstat_file or set the infile to the qstat_file
         if self.infile:
             self.qstat_filename = Path(self.infile)
         else:
@@ -168,9 +169,14 @@ class BaseQwatch(object):
                 qf.writelines(out)
             print(error)
 
-    def process_jobs(self):
+    def qstat_to_filtered_yaml(self):
+        """
+        This function saves the qstat information to a yaml file.  It parses the qstat data, filters out the unwanted
+        jobs, and then validates the data before saving it in YAML format.  It doesn't return anything, but it does
+        create a file.
+        """
         # Parse the qstat file and create a dictionary object
-        job_dict = self.qstat_parser()
+        job_dict = self.qstat_to_dict()
 
         # Filter and keep only the selected jobs and then create a YAML file
         kept_jobs, kept_dict = self.filter_jobs(job_dict)
@@ -188,7 +194,7 @@ class BaseQwatch(object):
                     with open(self.yaml_filename, 'w') as yf2:
                         yaml.dump(kept_dict, stream=yf2, default_flow_style=False)
 
-    def qstat_parser(self):
+    def qstat_to_dict(self):
         """
         The qstat parser takes the qstat file from the user infile or from the
         'qstat -f' command and parses it.  It uses the qstat keywords found in the
@@ -271,16 +277,21 @@ class BaseQwatch(object):
                 prev_item = item
         return mast_dict
 
-    def get_qstat_data(self):
+    def filtered_yaml_to_dict(self):
+        """
+        This function loads the yaml file created with qstat_to_filtered_yaml and validates the qstat data.
+        :return: A dictionary of jobs.
+        :rtype: dict
+        """
         if not self.yaml_filename.is_file() or self.watch is True:
-            self.process_jobs()
+            self.qstat_to_filtered_yaml()
             with open(self.yaml_filename, 'r') as yf:
                 jobs_dict = yaml.load(yf)
         else:
             with open(self.yaml_filename, 'r') as yf:
                 test = yaml.load(yf)
                 if not test:
-                    self.process_jobs()
+                    self.qstat_to_filtered_yaml()
         with open(self.yaml_filename, 'r') as yf2:
             jobs_dict = yaml.load(yf2)
         return jobs_dict
@@ -474,8 +485,15 @@ class Qwatch(BaseQwatch):
             data.to_csv(file, index=False, index_label=False)
 
     def watch_jobs(self):
-        self.parse_qstat_data()
-        self.process_jobs()
+        """
+        This function watches all of the jobs that passed the filter.  Multiple jobs will
+        utilize asyncio and the seperate async_qwatch.py script.
+        :return:
+        :rtype:
+        """
+        # Initialize data
+        self.save_qstat_data()
+        self.qstat_to_filtered_yaml()
         if len(self.jobs) > 1:
             kw_dict = {}
             kw_dict["jobs"] = self.jobs
