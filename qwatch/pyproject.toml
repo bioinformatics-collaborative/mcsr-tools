@@ -1,7 +1,9 @@
 [tool.poetry]
 name = "qwatch"
 version = "0.1.0"
-description = ""
+description = "The qwatch package was developed with pbs_version = 14.1.0 using the Mississippi Center for Computational
+Research (MCSR).  Its primary function is to parse qstat -f data over time.  The data and plots produced allow the user
+to make smarter decision regarding resource allocation for downstream batch jobs."
 authors = ["Rob Gilmore <rgilmore@umc.edu>"]
 
 [tool.poetry.dependencies]
