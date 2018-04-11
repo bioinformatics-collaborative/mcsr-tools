@@ -9,6 +9,8 @@ from dateutil import parser
 import random
 from datetime import datetime
 from time import sleep
+from qwatch import utils
+from pkg_resources import resource_filename
 from pprint import pprint
 
 
@@ -39,10 +41,11 @@ class BaseQwatch(object):
                        "all": __keywords
                        }
 
-    def __init__(self, jobs: (list or str)=None, email: str=None, infile: str=None, watch: (bool or None)=None,
-                 filename_pattern: str=None, directory: str='.', users: (list or str) = os.getlogin(),
-                 cmd: str="qstat -f", sleeper: int=120):
+    def __init__(self, jobs: (list or str)=None, users: (list or str) = os.getlogin(), email: str=None,
+                 infile: str=None, watch: (bool or None)=None, filename_pattern: str=None, directory: str='.',
+                 cmd: str="qstat -f", sleeper: int=120, cli=False, slack=None):
 
+        # TODO-ROB: Look at the checker in update_csv which is produceing "[0]" in the checker log file
         # TODO-ROB: Implement emial notifications
         # TODO-ROB: Implement slack notifications
         # TODO-ROB: Update variables to something more readable (filename_patter).
@@ -79,6 +82,8 @@ class BaseQwatch(object):
             self.users = [users]
         elif isinstance(users, list):
             self.users = users
+        elif isinstance(users, tuple):
+            self.users = list(users)
         else:
             raise TypeError("The users parameter is a single user string or a multi-user list.")
         # Get a job list
@@ -88,6 +93,8 @@ class BaseQwatch(object):
             self.jobs = [jobs]
         elif isinstance(jobs, list):
             self.jobs = jobs
+        elif isinstance(jobs, tuple):
+            self.users = list(jobs)
         else:
             raise TypeError("The jobs parameter is a single job string or a multi-job list.")
 
@@ -104,7 +111,8 @@ class BaseQwatch(object):
         self.data_filename = Path()
         self.info_filename = Path()
         self.plot_filename = Path()
-        self._yaml_config = "qstat_dict.yml"
+        self._yaml_config = resource_filename(utils.__name__, 'qstat_dict.yml')
+        self.r_line_graph_filename = resource_filename(utils.__name__, 'line_graph_workflow.R')
 
         # Other initial configuration
         self.initialize_data_files()
@@ -579,7 +587,7 @@ class Qwatch(BaseQwatch):
                     else:
                         inf = dir_path / Path(f'{file_pattern}.txt')
                 print(f'info_file: {inf}')
-                cmd = f'Rscript line_graph_workflow.R -d {str(df)} -i {str(inf)}'
+                cmd = f'Rscript {self.r_line_graph_filename} -d {str(df)} -i {str(inf)}'
                 if rdata_save:
                     cmd = cmd + ' --rdata_save'
                 if file_pattern:
@@ -593,7 +601,7 @@ class Qwatch(BaseQwatch):
                 print(out)
                 print(error)
         else:
-            plot = subprocess.Popen(f'Rscript line_graph_workflow.R -d {str(self.data_filename)} '
+            plot = subprocess.Popen(f'Rscript {self.r_line_graph_filename} -d {str(self.data_filename)} '
                                     f'-i {str(self.info_filename)} --name {self.filename_pattern}', stderr=subprocess.PIPE,
                                     stdout=subprocess.PIPE, shell=True, encoding='utf-8', universal_newlines=False)
             out = plot.stdout.readlines()
@@ -601,3 +609,30 @@ class Qwatch(BaseQwatch):
             print(out)
             print(error)
 
+
+# Borrowed from the discussion in the link below:
+# https://stackoverflow.com/questions/44247099/click-command-line-interfaces-make-options-required-if-other-optional-option-is
+class NotRequiredIf(click.Option):
+    def __init__(self, *args, **kwargs):
+        self.not_required_if = kwargs.pop('not_required_if')
+        assert self.not_required_if, "'not_required_if' parameter required"
+        kwargs['help'] = (kwargs.get('help', '') +
+                          ' NOTE: This argument is mutually exclusive with %s' %
+                          self.not_required_if
+                          ).strip()
+        super(NotRequiredIf, self).__init__(*args, **kwargs)
+
+    def handle_parse_result(self, ctx, opts, args):
+        we_are_present = self.name in opts
+        other_present = self.not_required_if in opts
+
+        if other_present:
+            if we_are_present:
+                raise click.UsageError(
+                    "Illegal usage: `%s` is mutually exclusive with `%s`" % (
+                        self.name, self.not_required_if))
+            else:
+                self.prompt = None
+
+        return super(NotRequiredIf, self).handle_parse_result(
+            ctx, opts, args)
