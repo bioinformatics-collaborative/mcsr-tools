@@ -39,9 +39,10 @@ class BaseQwatch(object):
                        "all": __keywords
                        }
 
-    def __init__(self, jobs: (list or str)=None, metadata: list=None, email: str=None, infile: str=None, watch: (bool or None)=None, plot: (bool or None)=None,
-                 filename_pattern: str=None, directory: str='.', users: (list or str) = os.getlogin(), cmd: str="qstat -f", sleeper: int=120):
-        # TODO-ROB: Remove the metadata and plot parameters
+    def __init__(self, jobs: (list or str)=None, email: str=None, infile: str=None, watch: (bool or None)=None,
+                 filename_pattern: str=None, directory: str='.', users: (list or str) = os.getlogin(),
+                 cmd: str="qstat -f", sleeper: int=120):
+
         # TODO-ROB: Implement emial notifications
         # TODO-ROB: Implement slack notifications
         # TODO-ROB: Update variables to something more readable (filename_patter).
@@ -92,11 +93,9 @@ class BaseQwatch(object):
 
         self.orig_jobs = self.jobs
 
-        #self.metadata = metadata
         self.email = email
         self.infile = infile
         self.watch = watch
-        #self.plot = plot
         self.directory = directory
         self.filename_pattern = filename_pattern
         self.sleeper = sleeper
