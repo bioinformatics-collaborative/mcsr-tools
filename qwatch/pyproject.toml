@@ -35,3 +35,6 @@ pyaml = "^17.12"
 
 [tool.poetry.dev-dependencies]
 pytest = "^3.5"
+
+[scripts]
+qwatch = 'qwatch:cli'
