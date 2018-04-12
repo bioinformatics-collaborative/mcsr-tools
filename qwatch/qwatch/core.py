@@ -46,12 +46,11 @@ class BaseQwatch(object):
                        }
 
     def __init__(self, jobs: (list or str)=None, users: (list or str) = os.getlogin(), email: str=None,
-                 infile: str=None, watch: (bool or None)=None, filename_pattern: str=None, directory: str='.',
-                 cmd: str="qstat -f", sleeper: int=120, clean=False, slack=None):
+                 infile: str=None, watch: (bool or None)=None, filename_pattern: str=None,
+                 directory: Path=f"qwatch{random.randint(9001, 100000)}", cmd: str="qstat -f", sleeper: int=120, clean=False, slack=None):
 
         # TODO-ROB: Implement emial notifications
         # TODO-ROB: Implement slack notifications
-        # TODO-ROB: Make click clean prompt the user
         # TODO-ROB: Redo full_workflow()
         # TODO-ROB: Add logger (through click?)
         # TODO-ROB: Remove the custom click Option
@@ -117,7 +116,10 @@ class BaseQwatch(object):
         self._async_filename = resource_filename(utils.__name__, 'async_qwatch.py')
         # Initialize other file based attributes
         self.infile = infile
+        while directory.is_dir():
+            directory = Path(f"qwatch{random.randint(9001, 100000)}")
         self.directory = directory
+        self.directory.mkdir(parents=True)
         self.filename_pattern = filename_pattern
         self.initialize_file_names()
 
@@ -155,7 +157,6 @@ class BaseQwatch(object):
             self.filename_pattern = filename_pattern.replace('.', '_')
 
         # Create file names using the pattern
-        Path(self.directory).mkdir(parents=True)
         self.yaml_filename = Path(self.directory) / Path(f"{self.filename_pattern}.yml")
         self.data_filename = Path(self.directory) / Path(f"{self.filename_pattern}.data")
         self.info_filename = Path(self.directory) / Path(f"{self.filename_pattern}.info")
