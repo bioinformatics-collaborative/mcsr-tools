@@ -9,9 +9,9 @@ from qwatch import Qwatch, NotRequiredIf, utils
 
 @click.command()
 @click.option('--jobs', '-j', cls=NotRequiredIf, not_required_if="users", multiple=True,
-              help="Provide the name of a job(s) to watch. (qstat -j 9001.sequoia -j 90002.sequoia")
+              help="Provide the name of a job(s) to watch. (qwatch -j 9001.sequoia -j 90002.sequoia")
 @click.option('--users', '-u', cls=NotRequiredIf, not_required_if="jobs", multiple=True,
-              help="Provide the name of a user(s) to watch. (qstat -u bnp -u mh1 -u r9001")
+              help="Provide the name of a user(s) to watch. (qwatch -u bnp -u mh1 -u r9001")
 @click.option('--email', '-e', default=None,
               help="Provide an email address for receiving data files or updates.")
 @click.option('--slack', nargs=2, default=None,
@@ -20,10 +20,10 @@ from qwatch import Qwatch, NotRequiredIf, utils
               help="Provide an input file to parse.  This does not watch a job, but it will parse qstat data for you.")
 @click.option('--filename_pattern', default=None,
               help="Provide a naming schema for the output files:\n"
-                   "        The yaml file's path looks like directory/filename_pattern.yml\n"
-                   "        The data file's path looks like directory/filename_pattern.csv\n"
-                   "        The info file's path looks like diretory/filename_pattern_info.txt\n"
-                   "        The plot file's path looks like directory/filename_pattern_plot.png")
+                   "The yaml file's path looks like <directory>/<filename_pattern>.yml\n"
+                   "The data file's path looks like <directory>/<filename_pattern>.csv\n"
+                   "The info file's path looks like <directory>/<filename_pattern>_info.txt\n"
+                   "The plot file's path looks like <directory>/<filename_pattern>_plot.png")
 @click.option('--directory', default=Path(f'qwatch{random.randint(9001, 10000)}'), show_default=True, # Over 9000!!
               help="Provide a custom output directory.  "
                    "qwatch will automatically create a directory with a random string of numbers.")
