@@ -1,4 +1,5 @@
 import os
+import shutil
 import click
 import subprocess
 import yaml
@@ -46,12 +47,15 @@ class BaseQwatch(object):
 
     def __init__(self, jobs: (list or str)=None, users: (list or str) = os.getlogin(), email: str=None,
                  infile: str=None, watch: (bool or None)=None, filename_pattern: str=None, directory: str='.',
-                 cmd: str="qstat -f", sleeper: int=120, cli=False, slack=None):
+                 cmd: str="qstat -f", sleeper: int=120, clean=False, slack=None):
 
         # TODO-ROB: Implement emial notifications
         # TODO-ROB: Implement slack notifications
-        # TODO-ROB: Update variables to something more readable (filename_patter).
-        # TODO-ROB: Create a cleaning function.
+        # TODO-ROB: Make click clean prompt the user
+        # TODO-ROB: Redo full_workflow()
+        # TODO-ROB: Add logger (through click?)
+        # TODO-ROB: Remove the custom click Option
+        # TODO-ROB: Do the rework in get_dicts()
         """
         A class for parsing "qstat -f" output on SGE systems for monitoring
         jobs and for making smart downstream decisions about resource allocation.
@@ -100,25 +104,28 @@ class BaseQwatch(object):
         else:
             raise TypeError("The jobs parameter is a single job string or a multi-job list.")
 
-        self.orig_jobs = self.jobs
-
-        self.email = email
-        self.infile = infile
-        self.watch = watch
-        self.directory = directory
-        self.filename_pattern = filename_pattern
-        self.sleeper = sleeper
+        # Initialize file types
         self.qstat_filename = Path()
         self.yaml_filename = Path()
         self.data_filename = Path()
         self.info_filename = Path()
         self.plot_filename = Path()
         self._new_keyword_log = Path()
+        # Initialize utility files
         self._yaml_config = resource_filename(utils.__name__, 'qstat_dict.yml')
         self.r_line_graph_filename = resource_filename(utils.__name__, 'line_graph_workflow.R')
         self._async_filename = resource_filename(utils.__name__, 'async_qwatch.py')
-        # Other initial configuration
-        self.initialize_data_files()
+        # Initialize other file based attributes
+        self.infile = infile
+        self.directory = directory
+        self.filename_pattern = filename_pattern
+        self.initialize_file_names()
+
+        # Initialize other attributes
+        self.orig_jobs = self.jobs
+        self.email = email
+        self.watch = watch
+        self.sleeper = sleeper
 
     def full_workflow(self, parse, process, data, metadata):
         if parse:
@@ -132,10 +139,9 @@ class BaseQwatch(object):
             elif process:
                 self.qstat_to_filtered_yaml()
 
-    def initialize_data_files(self):
+    def initialize_file_names(self):
         # Get a filename pattern based on other user input
         if not self.filename_pattern:
-            print("not_fnp")
             if self.infile:
                 filename_pattern = f"{self.infile}"
             elif len(self.users) == 1 and len(self.jobs) == 0:
@@ -157,7 +163,9 @@ class BaseQwatch(object):
         self._new_keyword_log = self.directory / Path('lost_and_found_qstat_keywords.log')
 
     def save_qstat_data(self):
-        # Save the 'qstat -f' output to the qstat_file or set the infile to the qstat_file
+        """
+        Save the 'qstat -f' output to the qstat_file or set the infile to the qstat_file.
+        """
         if self.infile:
             self.qstat_filename = Path(self.infile)
         else:
@@ -177,17 +185,18 @@ class BaseQwatch(object):
         jobs, and then validates the data before saving it in YAML format.  It doesn't return anything, but it does
         create a file.
         """
-        # Parse the qstat file and create a dictionary object
+
         job_dict = self.qstat_to_dict()
 
         # Filter and keep only the selected jobs and then create a YAML file
         kept_jobs, kept_dict = self.filter_jobs(job_dict)
-        print(f'jobs: {kept_jobs}')
         self.jobs = kept_jobs
-        # if the yaml file doesnt exist then update the jobs and dump the qstat data
+
+        # If the yaml file doesnt exist then update the jobs and dump the qstat data
         if not self.yaml_filename.is_file() or self.watch is True:
             with open(self.yaml_filename, 'w') as yf:
                 yaml.dump(kept_dict, stream=yf, default_flow_style=False)
+
         # If the yaml file is empty, then overwrite it.
         else:
             with open(self.yaml_filename, 'r') as yf:
@@ -426,6 +435,14 @@ class BaseQwatch(object):
         kept_jobs = list(set(kept_jobs))
         kept_dict = OrderedDict((k, job_dict[k]) for k in kept_jobs)
         return kept_jobs, kept_dict
+
+    def clean_output(self, ext_list=[".info", ".data", ".png", ".log"]):
+
+        for root, dirs, files in os.walk(self.directory):
+            for file in files:
+                if Path(file).suffix not in ext_list:
+                    file_to_delete = str(Path(root) / Path(file))
+                    os.remove(file_to_delete)
 
 
 class Qwatch(BaseQwatch):
