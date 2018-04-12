@@ -52,7 +52,6 @@ class BaseQwatch(object):
         # TODO-ROB: Implement emial notifications
         # TODO-ROB: Implement slack notifications
         # TODO-ROB: Add logger (through click?)
-        # TODO-ROB: Remove the custom click Option
         # TODO-ROB: Do the rework in get_dicts()
         """
         A class for parsing "qstat -f" output on SGE systems for monitoring
@@ -119,6 +118,7 @@ class BaseQwatch(object):
             directory = Path(f"qwatch{random.randint(9001, 100000)}")
         self.directory = directory
         self.directory.mkdir(parents=True)
+        self._temp_yml = directory / Path("temp_yml.yml")
         self.filename_pattern = filename_pattern
         self.initialize_file_names()
 
@@ -315,18 +315,19 @@ class BaseQwatch(object):
         :return:
         :rtype:
         """
-        jobs_dict = self.filtered_yaml_to_dict()
-        df = OrderedDict()
+        df = self.filtered_yaml_to_dict()
+        # jobs_dict = self.filtered_yaml_to_dict()
+        #df = OrderedDict()
         master_dict = OrderedDict()
         info_dict = OrderedDict()
         data_dict = OrderedDict()
         # TODO-ROB: Rework this or rework filterd_yaml_to_dict
-        for job in jobs_dict.keys():
-            row = OrderedDict()
-            _job = OrderedDict()
-            row = jobs_dict[job]
-            _job[job] = row
-            df.update(_job)
+        # for job in jobs_dict.keys():
+        #     row = OrderedDict()
+        #     _job = OrderedDict()
+        #     row = jobs_dict[job]
+        #     _job[job] = row
+        #     df.update(_job)
         for job in df.keys():
             var_dict = OrderedDict()
             # Store PBS Environment Variables
@@ -542,10 +543,10 @@ class Qwatch(BaseQwatch):
             kw_dict["sleeper"] = 5
             kw_dict["directory"] = self.directory
             # Call the asyncio setup for multiple jobs and begin watching
-            with open('temp_yaml.yml', 'w') as ty:
+            with open(self._temp_yml, 'w') as ty:
                 yaml.dump(kw_dict, stream=ty, default_flow_style=False)
 
-            qstat = subprocess.Popen(f'python3.6 {self._async_filename} -yamlfile temp_yaml.yml', stderr=subprocess.PIPE,
+            qstat = subprocess.Popen(f'python3.6 {self._async_filename} -yamlfile {self._temp_yml}', stderr=subprocess.PIPE,
                                      stdout=subprocess.PIPE, shell=True,
                                      encoding='utf-8', universal_newlines=False)
             out = qstat.stdout.read()
@@ -638,31 +639,3 @@ class Qwatch(BaseQwatch):
             error = plot.stderr.readlines()
             print(out)
             print(error)
-
-
-# Borrowed from the discussion in the link below:
-# https://stackoverflow.com/questions/44247099/click-command-line-interfaces-make-options-required-if-other-optional-option-is
-class NotRequiredIf(click.Option):
-    def __init__(self, *args, **kwargs):
-        self.not_required_if = kwargs.pop('not_required_if')
-        assert self.not_required_if, "'not_required_if' parameter required"
-        kwargs['help'] = (kwargs.get('help', '') +
-                          ' NOTE: This argument is mutually exclusive with %s.' %
-                          self.not_required_if
-                          ).strip()
-        super(NotRequiredIf, self).__init__(*args, **kwargs)
-
-    def handle_parse_result(self, ctx, opts, args):
-        we_are_present = self.name in opts
-        other_present = self.not_required_if in opts
-
-        if other_present:
-            if we_are_present:
-                raise click.UsageError(
-                    "Illegal usage: `%s` is mutually exclusive with `%s`." % (
-                        self.name, self.not_required_if))
-            else:
-                self.prompt = None
-
-        return super(NotRequiredIf, self).handle_parse_result(
-            ctx, opts, args)
