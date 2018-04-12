@@ -6,9 +6,7 @@ from datetime import datetime
 import importlib.util
 import argparse
 import yaml
-spec = importlib.util.spec_from_file_location(".", "./qwatch.py")
-qwatch = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(qwatch)
+import qwatch
 
 parser = argparse.ArgumentParser(description='A job watcher.')
 
@@ -23,7 +21,7 @@ async def _async_watch(job_id, directory, python_datetime=None, first_time=True,
     """Wait until a list of jobs finishes and get updates."""
 
     watch_one = qwatch.Qwatch(jobs=[job_id], directory=directory,  watch=True, users=None, **kwargs)
-    job_dict = watch_one.full_workflow(parse=True, process=True, data=True, metadata=False)
+    job_dict = watch_one.update_qstat_data(save=True, process=True, data=True)
 
     if job_dict:
         data = watch_one.get_data(data_frame=True, python_datetime=python_datetime)

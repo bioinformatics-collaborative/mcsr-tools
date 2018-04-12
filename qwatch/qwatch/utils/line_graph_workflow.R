@@ -1,4 +1,4 @@
-#!/usr/local/apps/R/3.4.3/bin Rscript
+#!/usr/local/apps/R/R-3.4.4/bin/ Rscript
 
 library(dplyr)
 library(lubridate)

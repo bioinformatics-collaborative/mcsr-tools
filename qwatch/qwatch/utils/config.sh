@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+module load R
 # MCSR configuration of pipenv and a user based pip
 wget https://bootstrap.pypa.io/get-pip.py
 python3.6 get-pip.py --user
