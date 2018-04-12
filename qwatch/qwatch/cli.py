@@ -43,15 +43,26 @@ from qwatch import Qwatch, NotRequiredIf, utils
                    "The default R is currently R/3.4.4 which has jpeg/png/tiff capabilities")
 @click.option('--r_install', '-ri', is_flag=True, flag_value=True, is_eager=True, default=False,
                help="This will install relevant R dependencies for the plotting script.")
+@click.option('--clean', is_flag=True, flag_value=True, is_eager=True, default=False,
+              help="This will clean/move all of the files other than *.info, *.data, *.png in the output directory "
+                   "to an archive folder.  Called on its own.")
+@click.option('--clean_after', '-ca', is_flag=True, flag_value=True, default=False,
+              help="This will clean directly after a qwatch monitors jobs")
 @click.version_option(version='0.2.0', prog_name="qwatch")
 def qwatch(**kwargs):
-    # jobs, users, email, slack, infile, watch, filename_pattern, directory, cmd, sleeper
+
     if platform != "linux" and platform != "linux2":
         raise OSError("This script is meant for a Linux environment.")
+
     pip_config = kwargs.pop('pip_config', None)
     r_config = kwargs.pop('r_config', None)
     r_install = kwargs.pop('r_install', None)
-    if r_config or r_install:
+    clean = kwargs.pop('clean', None)
+    clean_after = kwargs.pop('clean_after', None)
+    watcher = Qwatch(**kwargs)
+    if clean:
+        watcher.clean_output()
+    elif r_config or r_install:
         print("Loading R 3.4.4.....")
         os.system("module load intel;module load R")
         if r_install:
@@ -65,5 +76,6 @@ def qwatch(**kwargs):
         print("Below are are the paths of your executables:")
         os.system("which pip pipenv python3.6")
     else:
-        watcher = Qwatch(cli=True, **kwargs)
         watcher.watch_jobs()
+        if clean_after:
+            watcher.clean_output()
