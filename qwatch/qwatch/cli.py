@@ -41,12 +41,12 @@ from qwatch import Qwatch, NotRequiredIf, utils
 @click.option('--r_config', '-rc', is_flag=True, flag_value=True, is_eager=True, default=False,
               help="This will load the proper R environment with the LMOD command (module load R)."
                    "The default R is currently R/3.4.4 which has jpeg/png/tiff capabilities")
-@click.options('--r_install', '-ri', is_flat=True, flag_value=True, is_eager=True, default=False,
+@click.option('--r_install', '-ri', is_flag=True, flag_value=True, is_eager=True, default=False,
                help="This will install relevant R dependencies for the plotting script.")
 @click.version_option(version='0.2.0', prog_name="qwatch")
 def qwatch(**kwargs):
     # jobs, users, email, slack, infile, watch, filename_pattern, directory, cmd, sleeper
-    if platform != "linux" or platform != "linux2":
+    if platform != "linux" and platform != "linux2":
         raise OSError("This script is meant for a Linux environment.")
     pip_config = kwargs.pop('pip_config', None)
     r_config = kwargs.pop('r_config', None)
@@ -58,7 +58,7 @@ def qwatch(**kwargs):
             r_install_file = resource_filename(utils.__name__, 'install.R')
             print("Installing necessary packages...")
             os.system(f"Rscript {r_install_file}")
-    if pip_config:
+    elif pip_config:
         config_file = resource_filename(utils.__name__, 'config.sh')
         os.system(f". {config_file}")
         print("pip and pipenv have been configured to run locally for python3.6 (miniconda3).")

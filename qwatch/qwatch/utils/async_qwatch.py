@@ -6,9 +6,7 @@ from datetime import datetime
 import importlib.util
 import argparse
 import yaml
-spec = importlib.util.spec_from_file_location(".", "./qwatch.py")
-qwatch = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(qwatch)
+import qwatch
 
 parser = argparse.ArgumentParser(description='A job watcher.')
 
