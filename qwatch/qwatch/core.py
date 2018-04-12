@@ -51,7 +51,6 @@ class BaseQwatch(object):
 
         # TODO-ROB: Implement emial notifications
         # TODO-ROB: Implement slack notifications
-        # TODO-ROB: Redo full_workflow()
         # TODO-ROB: Add logger (through click?)
         # TODO-ROB: Remove the custom click Option
         # TODO-ROB: Do the rework in get_dicts()
@@ -129,17 +128,17 @@ class BaseQwatch(object):
         self.watch = watch
         self.sleeper = sleeper
 
-    def full_workflow(self, parse, process, data, metadata):
-        if parse:
+    def update_qstat_data(self, save, process, data):
+        # Save qstat output
+        if save:
             self.save_qstat_data()
-            if metadata or data:
-                if metadata:
-                    _data = self.get_dicts()
-                if data:
-                    _data = self.filtered_yaml_to_dict()
-                return _data
-            elif process:
-                self.qstat_to_filtered_yaml()
+        # Process qstat output and create the filtered yaml file
+        if process:
+            self.qstat_to_filtered_yaml()
+        # Take the filtered yaml file and create a dictionary
+        if data:
+            _data = self.filtered_yaml_to_dict()
+            return _data
 
     def initialize_file_names(self):
         # Get a filename pattern based on other user input
@@ -297,8 +296,6 @@ class BaseQwatch(object):
         """
         if not self.yaml_filename.is_file() or self.watch is True:
             self.qstat_to_filtered_yaml()
-            with open(self.yaml_filename, 'r') as yf:
-                jobs_dict = yaml.load(yf)
         else:
             with open(self.yaml_filename, 'r') as yf:
                 test = yaml.load(yf)
@@ -562,7 +559,7 @@ class Qwatch(BaseQwatch):
     def _watch(self, python_datetime=None, first_time=True):
         """Wait until a job finishes and get updates."""
 
-        job_dict = self.full_workflow(parse=True, process=True, data=True, metadata=False)
+        job_dict = self.update_qstat_data(save=True, process=True, data=True)
 
         if job_dict:
             data = self.get_data(data_frame=True, python_datetime=python_datetime)
