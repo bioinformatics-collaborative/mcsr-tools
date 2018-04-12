@@ -110,10 +110,10 @@ class BaseQwatch(object):
         self.data_filename = Path()
         self.info_filename = Path()
         self.plot_filename = Path()
+        self._new_keyword_log = Path()
         self._yaml_config = resource_filename(utils.__name__, 'qstat_dict.yml')
         self.r_line_graph_filename = resource_filename(utils.__name__, 'line_graph_workflow.R')
         self._async_filename = resource_filename(utils.__name__, 'async_qwatch.py')
-
         # Other initial configuration
         self.initialize_data_files()
         self._setup_yaml()
@@ -155,18 +155,19 @@ class BaseQwatch(object):
             self.filename_pattern = filename_pattern.replace('.', '_')
 
         # Create file names using the pattern
-        Path(self.directory).mkdir(parents=True, exist_ok=True)
+        Path(self.directory).mkdir(parents=True)
         self.yaml_filename = Path(self.directory) / Path(f"{self.filename_pattern}.yml")
-        self.data_filename = Path(self.directory) / Path(f"{self.filename_pattern}.csv")
-        self.info_filename = Path(self.directory) / Path(f"{self.filename_pattern}_info.txt")
+        self.data_filename = Path(self.directory) / Path(f"{self.filename_pattern}.data")
+        self.info_filename = Path(self.directory) / Path(f"{self.filename_pattern}.info")
         self.plot_filename = Path(self.directory) / Path(f"{self.filename_pattern}_plot.png")
+        self._new_keyword_log = self.directory / Path('lost_and_found_qstat_keywords.log')
 
     def save_qstat_data(self):
         # Save the 'qstat -f' output to the qstat_file or set the infile to the qstat_file
         if self.infile:
             self.qstat_filename = Path(self.infile)
         else:
-            self.qstat_filename = Path(self.directory) / Path(f"{self.filename_pattern}.txt")
+            self.qstat_filename = Path(self.directory) / Path(f"{self.filename_pattern}.qstat")
             qstat = subprocess.Popen(self.cmd, stderr=subprocess.PIPE,
                                      stdout=subprocess.PIPE, shell=True,
                                      encoding='utf-8', universal_newlines=False)
@@ -461,6 +462,33 @@ class Qwatch(BaseQwatch):
                 _kwargs[var] = attr
         return _kwargs
 
+    def new_keyword_logger(self, data):
+        """
+        This logger function checks for new keywords, and adds them to a
+        lost_and_found_keywords.log file.
+        :param data: The data to check.
+        """
+        with open(self._yaml_config, 'r') as yc:
+            _checker_dict = yaml.load(yc)
+            _checker_list = list()
+            _checker_list.append('Job Id')
+            _checker_list = _checker_list + list(_checker_dict['Job Id'].keys())
+            _checker_list = _checker_list + list(_checker_dict['Job Id']['Variable_List'].keys())
+        _data_index_list = list(data.index)
+        diff = list(set(_data_index_list) - set(_checker_list))
+        if diff == [0]:
+            diff = []
+        if len(diff) != 0:
+            if not self._new_keyword_log.is_file():
+                with open(self._new_keyword_log, 'w') as cl:
+                    cl.write("***********************************   NOTICE  ***********************************\n\n")
+                    cl.write("This is a log file for new keywords that were missed by the parser.")
+                    cl.write("Please email this file to Rob Gilmore at rgilmore@umc.edu, if new keywords were logged.")
+                    cl.write("Thanks!\n\n")
+                    cl.write("***********************************   NOTICE  ***********************************")
+            with open(self._new_keyword_log, 'a') as cl:
+                cl.write('Unresolved qstat keyword: %s' % diff)
+
     def update_csv(self, file, data):
         """
         The update_csv file is named appropriately, but it also checks for undocumented qstat keywords.
@@ -471,21 +499,13 @@ class Qwatch(BaseQwatch):
         :return:
         :rtype:
         """
-        with open(self._yaml_config, 'r') as yc:
-            _checker_dict = yaml.load(yc)
-            _checker_list = []
-            _checker_list.append('Job Id')
-            _checker_list = _checker_list + list(_checker_dict['Job Id'].keys())
-            _checker_list = _checker_list + list(_checker_dict['Job Id']['Variable_List'].keys())
-        _data_index_list = list(data.index)
-        diff = list(set(_data_index_list) - set(_checker_list))
-        if len(diff) != 0:
-            with open('checker_log.log', 'a') as cl:
-                cl.write('There are unresolved qstat keywords: %s\nAdd them to the qstat_dict.yml file\n\n' % diff)
+
+        # Check for undocumented keywords
+        self.new_keyword_logger(data)
+
+        # Append new data to the csv file (either .info or .data
         if file.is_file():
             file_df = pd.read_csv(file, index_col=False)
-            print(f'fdf{file_df}')
-            print(f'd{data}')
             updated_df = pd.concat([file_df, data])
             updated_df.to_csv(file, index=False, index_label=False)
         else:
