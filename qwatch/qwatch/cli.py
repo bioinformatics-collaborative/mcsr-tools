@@ -18,13 +18,13 @@ from qwatch import Qwatch, NotRequiredIf, utils
               help="Provide slack details. (undeveloped)")
 @click.option('--infile', '-in', default=None, type=click.Path(exists=True),
               help="Provide an input file to parse.  This does not watch a job, but it will parse qstat data for you.")
-@click.option('--filename_pattern', default=None,
+@click.option('--filename_pattern', '-fp', default=None,
               help="Provide a naming schema for the output files:\n"
                    "The yaml file's path looks like <directory>/<filename_pattern>.yml\n"
                    "The data file's path looks like <directory>/<filename_pattern>.csv\n"
                    "The info file's path looks like <directory>/<filename_pattern>_info.txt\n"
                    "The plot file's path looks like <directory>/<filename_pattern>_plot.png")
-@click.option('--directory', default=Path(f'qwatch{random.randint(9001, 10000)}'), show_default=True, # Over 9000!!
+@click.option('--directory', '-d', default=Path(f'qwatch{random.randint(9001, 10000)}'), show_default=True, # Over 9000!!
               help="Provide a custom output directory.  "
                    "qwatch will automatically create a directory with a random string of numbers.")
 @click.option('--cmd', default="qstat -f", type=str, show_default=True,
@@ -59,8 +59,11 @@ def qwatch(**kwargs):
     r_install = kwargs.pop('r_install', None)
     clean = kwargs.pop('clean', None)
     clean_after = kwargs.pop('clean_after', None)
+    dir = kwargs["directory"]
     watcher = Qwatch(**kwargs)
     if clean:
+        click.confirm(f"Warning this will take all files other than *.info, *.data, and *.png in {dir} and place them "
+                      f"in an archive folder.  \nDo you still want to continue?", abort=True)
         watcher.clean_output()
     elif r_config or r_install:
         print("Loading R 3.4.4.....")
