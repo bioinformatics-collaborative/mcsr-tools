@@ -11,7 +11,6 @@ from datetime import datetime
 from time import sleep
 from qwatch import utils
 from pkg_resources import resource_filename
-from pprint import pprint
 
 
 class BaseQwatch(object):
@@ -113,6 +112,7 @@ class BaseQwatch(object):
         self.plot_filename = Path()
         self._yaml_config = resource_filename(utils.__name__, 'qstat_dict.yml')
         self.r_line_graph_filename = resource_filename(utils.__name__, 'line_graph_workflow.R')
+        self._async_filename = resource_filename(utils.__name__, 'async_qwatch.py')
 
         # Other initial configuration
         self.initialize_data_files()
@@ -507,7 +507,8 @@ class Qwatch(BaseQwatch):
             kw_dict["kwargs"] = self._get_subset_kwargs(skipped_kwargs=["jobs", "directory", "qwatch", "watch", "_yaml_config",
                                                                         "info_filename", "plot_filename", "qstat_filename",
                                                                         "data_filename", "yaml_filename", "users",
-                                                                        "filename_pattern", "orig_jobs"])
+                                                                        "filename_pattern", "orig_jobs",
+                                                                        "_async_filename", "r_line_graph_filename"])
 
             kw_dict["sleeper"] = 5
             kw_dict["directory"] = self.directory
@@ -515,7 +516,7 @@ class Qwatch(BaseQwatch):
             with open('temp_yaml.yml', 'w') as ty:
                 yaml.dump(kw_dict, stream=ty, default_flow_style=False)
 
-            qstat = subprocess.Popen('python3.6 async_qwatch.py -yamlfile temp_yaml.yml', stderr=subprocess.PIPE,
+            qstat = subprocess.Popen(f'python3.6 {self._async_filename} -yamlfile temp_yaml.yml', stderr=subprocess.PIPE,
                                      stdout=subprocess.PIPE, shell=True,
                                      encoding='utf-8', universal_newlines=False)
             out = qstat.stdout.read()
