@@ -1,8 +1,12 @@
 # qwatch
+
+*** THESE DOCS ARE OUT OF DATE ***
+
+*** IF WHEEL IS INSTALLED THEN USE qwatch --help FOR MORE INFO ***
+
 qwatch is a command line utility for monitoring PBS jobs on the MCSR (and perhaps similar systems)
 
 ## Outline
-* Look up qstat commands for inspiration
 * Command line development:
     * _--user_ option displays info about all of the jobs from a specific user/list of users
     * _--job_ option displays info about a specific job/list of jobs
