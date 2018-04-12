@@ -11,10 +11,14 @@ from datetime import datetime
 from time import sleep
 from qwatch import utils
 from pkg_resources import resource_filename
+from qwatch import _setup_yaml
 
 
 class BaseQwatch(object):
+    # Setup the yaml with OrderedDict
+    _setup_yaml()
     # Static qstat Keywords
+
     __misc_kw = ["Checkpoint", "Error_Path", "exec_host", "exec_vnode", "Hold_Types", "Join_Path",
                              "Keep_Files", "Mail_Points", "Output_Path", "Rerunable", "Resource_List.mpiprocs",
                              "Resource_List.ncpus", "Resource_List.nodect", "Resource_List.nodes",
@@ -44,7 +48,6 @@ class BaseQwatch(object):
                  infile: str=None, watch: (bool or None)=None, filename_pattern: str=None, directory: str='.',
                  cmd: str="qstat -f", sleeper: int=120, cli=False, slack=None):
 
-        # TODO-ROB: Look at the checker in update_csv which is produceing "[0]" in the checker log file
         # TODO-ROB: Implement emial notifications
         # TODO-ROB: Implement slack notifications
         # TODO-ROB: Update variables to something more readable (filename_patter).
@@ -116,15 +119,6 @@ class BaseQwatch(object):
         self._async_filename = resource_filename(utils.__name__, 'async_qwatch.py')
         # Other initial configuration
         self.initialize_data_files()
-        self._setup_yaml()
-
-    @classmethod
-    def represent_dictionary_order(self, cls, dict_data):
-        return cls.represent_mapping('tag:yaml.org,2002:map', dict_data.items())
-
-    def _setup_yaml(self):
-        """ https://stackoverflow.com/a/8661021 """
-        yaml.add_representer(OrderedDict, self.represent_dictionary_order)
 
     def full_workflow(self, parse, process, data, metadata):
         if parse:
