@@ -18,7 +18,7 @@ version_path <- sprintf("%s.%s", R.version$major, R.version$minor)
 local_lib <- sprintf("~/R/%s-library/%s", R.version$platform, version_path)
 
 if (!dir.exists(local_lib)) {
-  dir.create(local_lib)
+  dir.create(local_lib, recursive=TRUE)
 }
 
 .libPaths(local_lib)
